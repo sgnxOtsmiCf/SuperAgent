@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.sgnxotsmicf.dao.RoleMapper">
+
+
+    <select id="getRoleList" resultType="cn.sgnxotsmicf.common.po.Role">
+        select sr.id,
+               sr.role,
+               sr.role_name,
+               sr.create_time,
+               sr.update_time
+        from superagent.superagent_role sr
+                 inner join superagent.superagent_user_role sur on sr.id = sur.role_id
+                 inner join superagent.superagent_user su on sur.user_id = su.id
+        where sr.is_deleted = 0
+          and su.is_deleted = 0
+          and sur.is_deleted = 0
+          and su.id = #{userId}
+    </select>
+</mapper>

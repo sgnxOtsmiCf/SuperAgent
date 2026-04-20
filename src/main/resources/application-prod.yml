@@ -1,0 +1,134 @@
+############## 敏感配置 - 生产环境（请填写实际值）##############
+
+spring:
+  # 数据源配置
+  datasource:
+    primary:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url:
+      username:
+      password:
+      type: com.alibaba.druid.pool.DruidDataSource
+    vector:
+      driver-class-name: org.postgresql.Driver
+      url:
+      username:
+      password:
+      type: com.alibaba.druid.pool.DruidDataSource
+
+  # Redis配置
+  data:
+    redis:
+      port:
+      host:
+      timeout: 10s
+      lettuce:
+        pool:
+          max-active: 50
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+      username:
+      password:
+      database:
+
+  # RabbitMQ配置
+  rabbitmq:
+    host:
+    port:
+    username:
+    password:
+    publisher-returns: true
+    publisher-confirm-type: correlated
+
+  # 邮件配置
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username:
+    password:
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+        debug: false
+
+  # AI配置
+  ai:
+    dashscope:
+      api-key:
+      read-timeout: 60000
+      chat:
+        options:
+          model: qwen-plus
+          enable-thinking: true
+          enable-search: true
+    deepseek:
+      api-key:
+      chat:
+        options:
+          model: deepseek-reasoner
+    openai:
+      api-key:
+      base-url: https://openrouter.ai/api/v1/chat/completions
+      chat:
+        options:
+          model: x-ai/grok-4.1-fast
+          temperature: 0.7
+          max-tokens: 2048
+    zhipuai:
+      api-key:
+      chat:
+        options:
+          model: GLM-4.5-AirX
+    vectorstore:
+      pgvector:
+        index-type: hnsw
+        dimensions: 1536
+        distance-type: cosine_distance
+        max-document-batch-size: 10000
+        initialize-schema: false
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+    alibaba:
+      toolcalling:
+        minio:
+          endpoint:
+          access-key:
+          secret-key:
+
+# 阿里云配置
+alibaba:
+  cloud:
+    access-key:
+    secret-key:
+
+# 搜索API配置
+search-api:
+  api-key:
+
+# Tavily搜索配置
+tavily:
+  max-retries: 2
+  apiKey:
+  apiUrl: https://api.tavily.com/search
+
+# Sa-Token配置
+sa-token:
+  token-name: SuperAgent
+  timeout: 2592000
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  token-style: uuid
+  is-log: true
+
+#Pexels
+image-search:
+  apiKey:

@@ -1,0 +1,257 @@
+package cn.sgnxotsmicf.agentTool.commonTool;/*
+ * Copyright 2025 - 2025 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import java.util.List;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.ai.util.json.JsonParser;
+import org.springframework.util.Assert;
+
+/**
+ * Tool for asking users clarifying questions during AI agent execution.
+ *
+ * <p>
+ * This is a Spring AI implementation of Claude Code's AskUserQuestion tool, enabling AI
+ * agents to gather user preferences, clarify ambiguous instructions, and get decisions on
+ * implementation choices during execution.
+ *
+ * <p>
+ * <strong>Thread Safety:</strong> This class is thread-safe. The tool can be safely used
+ * by multiple threads concurrently. However, thread safety depends on the provided
+ * {@link QuestionHandler} being thread-safe. If the handler maintains mutable shared
+ * state, the caller must ensure proper synchronization.
+ *
+ * <p>
+ *
+ * Note on Exception Handling: The tool validates the answers returned by the
+ * {@link QuestionHandler}. If the answers are invalid (e.g., missing answers for
+ * questions, null values), an {@link InvalidUserAnswerException} is thrown. This
+ * exception indicates that the user provided invalid input. Such exceptions are typically
+ * raised after validating the answers map and have to be propagated to the user, not the
+ * AI agent.
+ * <code>spring.ai.tools.throw-exception-on-error=com.springai.tool.AskUserQuestionTool$InvalidUserAnswerException</code>
+ * has to be set for this behavior.
+ *
+ * @author Christian Tzolov
+ * @see <a href=
+ * "https://platform.claude.com/docs/en/agent-sdk/user-input#question-format"> Claude
+ * Agent SDK - Question Format</a>
+ */
+public class AskUserQuestionTool {
+
+	private static final Logger logger = LoggerFactory.getLogger(AskUserQuestionTool.class);
+
+	@FunctionalInterface
+	public interface QuestionHandler {
+		Map<String, String> handle(String userId, List<Question> questions);
+	}
+
+	private final QuestionHandler questionHandler;
+
+	private final boolean answersValidation;
+
+	protected AskUserQuestionTool(QuestionHandler questionHandler,
+								  boolean answersValidation) {
+		this.questionHandler = questionHandler;
+		this.answersValidation = answersValidation;
+	}
+
+	public record Question(
+			@JsonPropertyDescription("The complete question to ask the user. Should be clear, specific, and end with a question mark. Example: \"Which library should we use for date formatting?\"") String question,
+
+			@JsonPropertyDescription("Very short label displayed as a chip/tag (max 12 chars). Examples: \"Auth method\", \"Library\", \"Approach\"") String header,
+
+			@JsonPropertyDescription("The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled).") List<Option> options,
+
+			@JsonPropertyDescription("Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive. Defaults to false if null.") Boolean multiSelect) {
+
+		public Question {
+			if (question == null || question.isBlank()) {
+				throw new IllegalArgumentException("Question text cannot be null or blank");
+			}
+
+			if (header == null || header.isBlank()) {
+				throw new IllegalArgumentException("Header cannot be null or blank");
+			}
+			if (header.length() > 12) {
+				logger.warn("Header length is greater than 12 characters: {}", header);
+			}
+
+			if (options == null || options.size() < 2 || options.size() > 4) {
+				logger.warn("Options size must be between 2 and 4, got: {}", options == null ? 0 : options.size());
+			}
+
+			if (multiSelect == null) {
+				multiSelect = false;
+			}
+
+			options = List.copyOf(options);
+		}
+
+		public record Option(
+				@JsonPropertyDescription("The display text for this option that the user will see and select. Should be concise (1-5 words) and clearly describe the choice.") String label,
+
+				@JsonPropertyDescription("Explanation of what this option means or what will happen if chosen. Useful for providing context about trade-offs or implications.") String description) {
+
+			public Option {
+				if (label == null || label.isBlank()) {
+					throw new IllegalArgumentException("Option label cannot be null or blank");
+				}
+				if (description == null || description.isBlank()) {
+					throw new IllegalArgumentException("Option description cannot be null or blank");
+				}
+			}
+		}
+	}
+
+	@Tool(name = "AskUserQuestionTool",
+			description = """
+					Use this tool when you need to ask the user questions during execution. This allows you to:
+					1. Gather user preferences or requirements
+					2. Clarify ambiguous instructions
+					3. Get decisions on implementation choices as you work
+					4. Offer choices to the user about what direction to take.
+
+					Usage notes:
+					- Users will always be able to select "Other" to provide custom text input
+					- Use multiSelect: true to allow multiple answers to be selected for a question
+					- If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label
+					""")
+	public String askUserQuestion(
+			@ToolParam(description = "Questions to ask the user (1-4 questions)") List<Question> questions,
+			@ToolParam(description = "User answers collected by the permission component",
+					required = false) Map<String, String> answers,
+			ToolContext toolContext) {
+
+		this.validateQuestions(questions);
+
+		logger.debug("Asking user {} question(s)", questions.size());
+		if (logger.isTraceEnabled()) {
+			questions.forEach(q -> logger.trace("Question: {}", q.question()));
+		}
+
+		Object userIdObj = toolContext.getContext().get("userId");
+		if (userIdObj == null) {
+			throw new IllegalArgumentException("userId not found in ToolContext. " +
+					"Please pass userId via .toolContext(Map.of(\"userId\", \"xxx\")) when calling ChatClient.");
+		}
+		String userId = userIdObj.toString();
+		Map<String, String> result = this.questionHandler.handle(userId, questions);
+
+		if (this.answersValidation) {
+			this.validateAnswers(questions, result);
+		}
+
+		if (logger.isDebugEnabled() && result != null) {
+			logger.debug("Received {} answer(s) from user", result.size());
+		}
+
+		return "User has answered your questions: " + JsonParser.toJson(result);
+	}
+
+	private void validateQuestions(List<Question> questions) {
+		if (questions == null) {
+			throw new IllegalArgumentException("Questions list cannot be null");
+		}
+
+		if (questions.isEmpty() || questions.size() > 4) {
+			throw new IllegalArgumentException("Questions list must contain 1-4 questions, got: " + questions.size());
+		}
+
+		for (int i = 0; i < questions.size(); i++) {
+			Question question = questions.get(i);
+			if (question == null) {
+				throw new IllegalArgumentException("Question at index " + i + " is null");
+			}
+		}
+	}
+
+	private void validateAnswers(List<Question> questions, Map<String, String> answers) {
+		if (answers == null) {
+			throw new InvalidUserAnswerException(
+					"questionHandler returned null. Must return a non-null Map<String, String>");
+		}
+
+		for (Question question : questions) {
+			String questionText = question.question();
+
+			if (!answers.containsKey(questionText)) {
+				throw new InvalidUserAnswerException(
+						"Missing answer for question: \"" + questionText + "\". All questions must have answers.");
+			}
+
+			String answerValue = answers.get(questionText);
+			if (answerValue == null) {
+				throw new InvalidUserAnswerException("Answer for question \"" + questionText
+						+ "\" is null. Answer values should not be null (empty strings are acceptable).");
+			}
+		}
+
+		if (answers.size() > questions.size()) {
+			for (String answerKey : answers.keySet()) {
+				boolean foundMatch = questions.stream().anyMatch(q -> q.question().equals(answerKey));
+				if (!foundMatch) {
+					logger.warn("Answer map contains unexpected key that does not match any question: \"{}\"",
+							answerKey);
+				}
+			}
+		}
+	}
+
+	public static class InvalidUserAnswerException extends RuntimeException {
+
+		public InvalidUserAnswerException(String message) {
+			super(message);
+		}
+
+	}
+
+	public static Builder builder() {
+		return new Builder();
+	}
+
+	public static class Builder {
+
+		private QuestionHandler questionHandler;
+
+		private boolean answersValidation = true;
+
+		public Builder answersValidation(boolean answersValidation) {
+			this.answersValidation = answersValidation;
+			return this;
+		}
+
+		public Builder questionHandler(QuestionHandler questionHandler) {
+			Assert.notNull(questionHandler, "questionHandler must not be null");
+			this.questionHandler = questionHandler;
+			return this;
+		}
+
+		public AskUserQuestionTool build() {
+			Assert.notNull(questionHandler, "questionHandler must be provided");
+			return new AskUserQuestionTool(questionHandler, answersValidation);
+		}
+
+	}
+
+}

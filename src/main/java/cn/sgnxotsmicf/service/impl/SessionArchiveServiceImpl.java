@@ -4,7 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.sgnxotsmicf.app.superagent.SuperAgentFactory;
 import cn.sgnxotsmicf.chatMemory.NoSqlChatMemoryFactory;
-import cn.sgnxotsmicf.common.dto.ArchiveMessage;
+import cn.sgnxotsmicf.common.rabbitmq.entity.ArchiveMessage;
 import cn.sgnxotsmicf.common.po.ChatMessage;
 import cn.sgnxotsmicf.common.po.ChatSession;
 import cn.sgnxotsmicf.common.rabbitmq.constant.MqConst;

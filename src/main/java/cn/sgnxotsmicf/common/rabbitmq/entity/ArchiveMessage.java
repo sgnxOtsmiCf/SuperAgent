@@ -1,12 +1,11 @@
-package cn.sgnxotsmicf.common.dto;
+package cn.sgnxotsmicf.common.rabbitmq.entity;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
-import java.io.Serial;
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -14,51 +13,19 @@ import java.time.LocalDateTime;
  * @Author: lixiang
  * @CreateDate: 2026/4/15 12:24
  * @Version: 1.0
- * @Description: 用于RabbitMQ传输的归档请求消息
+ * @Description: 用于 RabbitMQ 传输的归档请求消息
  */
 @Data
-@Builder
+@EqualsAndHashCode(callSuper = true)
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ArchiveMessage implements Serializable {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * 消息唯一ID
-     */
-    private String messageId;
-
-    /**
-     * 会话ID
-     */
-    private String sessionId;
-
-    /**
-     * 用户ID
-     */
-    private Long userId;
-
-    /**
-     * Agent ID
-     */
-    private Long agentId;
+public class ArchiveMessage extends BaseRabbitMessage {
 
     /**
      * 触发方式：AUTO-自动过期触发 MANUAL-手动触发
      */
     private String triggerType;
-
-    /**
-     * 消息创建时间
-     */
-    private LocalDateTime createTime;
-
-    /**
-     * 重试次数
-     */
-    private Integer retryCount;
 
     /**
      * 触发方式常量
@@ -71,7 +38,7 @@ public class ArchiveMessage implements Serializable {
      */
     public static ArchiveMessage createAutoArchiveMessage(String sessionId, Long userId, Long agentId) {
         return ArchiveMessage.builder()
-                .messageId(generateMessageId())
+                .messageId(generateMessageId("ARCH"))
                 .sessionId(sessionId)
                 .userId(userId)
                 .agentId(agentId)
@@ -86,7 +53,7 @@ public class ArchiveMessage implements Serializable {
      */
     public static ArchiveMessage createManualArchiveMessage(String sessionId, Long userId, Long agentId) {
         return ArchiveMessage.builder()
-                .messageId(generateMessageId())
+                .messageId(generateMessageId("ARCH"))
                 .sessionId(sessionId)
                 .userId(userId)
                 .agentId(agentId)
@@ -94,19 +61,5 @@ public class ArchiveMessage implements Serializable {
                 .createTime(LocalDateTime.now())
                 .retryCount(0)
                 .build();
-    }
-
-    /**
-     * 生成消息ID
-     */
-    private static String generateMessageId() {
-        return "ARCH" + System.currentTimeMillis() + "_" + (int) (Math.random() * 10000);
-    }
-
-    /**
-     * 增加重试次数
-     */
-    public void incrementRetry() {
-        this.retryCount = (this.retryCount == null ? 0 : this.retryCount) + 1;
     }
 }

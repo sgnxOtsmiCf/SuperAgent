@@ -40,6 +40,24 @@ spring:
     password:
     publisher-returns: true
     publisher-confirm-type: correlated
+    listener:
+      simple:
+        # 手动ACK必须开启
+        acknowledge-mode: manual
+        # 每次只拉取1条消息
+        prefetch: 1
+        retry:
+          enabled: true
+          # 本地最大重试次数
+          max-attempts: 3
+          # 第一次重试延迟 1s
+          initial-interval: 1000
+          # 重试间隔乘数 2 → 1s→2s→4s
+          multiplier: 2
+          # 最大重试间隔 5s
+          max-interval: 5000
+          # 本地重试全部失败后，消息进入死信队列
+          stateless: true
 
   # 邮件配置
   mail:

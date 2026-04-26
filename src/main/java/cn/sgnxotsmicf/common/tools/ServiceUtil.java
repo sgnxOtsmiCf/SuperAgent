@@ -4,10 +4,10 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import cn.sgnxotsmicf.chatMemory.NoSqlChatMemoryFactory;
-import cn.sgnxotsmicf.common.dto.ChatSessionDTO;
 import cn.sgnxotsmicf.common.po.ChatMessage;
 import cn.sgnxotsmicf.common.po.ChatSession;
 import cn.sgnxotsmicf.common.rabbitmq.constant.MqConst;
+import cn.sgnxotsmicf.common.rabbitmq.entity.SessionMessage;
 import cn.sgnxotsmicf.common.rabbitmq.service.RabbitService;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
@@ -19,9 +19,7 @@ import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.rabbitmq.client.LongString;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.config.Config;
@@ -38,7 +36,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -103,26 +100,20 @@ public class ServiceUtil {
                         "agentId", String.valueOf(agentId),
                         "session_status", "1",
                         "isTop", ""));
-        ChatSessionDTO chatSessionDTO = ChatSessionDTO.builder()
-                .userId(userId)
-                .sessionId(sessionId)
-                .agentId(agentId)
-                .sessionName(sessionName)
-                .lastActive(LocalDateTime.now())
-                .sessionStatus(1)
-                .doType(ChatSessionDTO.INSERT)
-                .build();
-        sendChatSession(chatSessionDTO);
+
+        SessionMessage sessionMessage = SessionMessage.createInsertMessage(sessionId, userId, agentId, sessionName);
+
+        sendChatSession(sessionMessage);
     }
 
 
     /**
      * 使用rabbitmq异步的消费ChatSession，存入数据库中
-     * @param chatSessionDTO ChatSessionDTO对象
+     * @param sessionMessage  SessionMessage对象
      */
-    public void sendChatSession(ChatSessionDTO chatSessionDTO){
+    public void sendChatSession(SessionMessage sessionMessage){
         rabbitService.sendMessage(MqConst.EXCHANGE_CHAT_SESSION_DB, MqConst.ROUTING_CHAT_SESSION_DB,
-                chatSessionDTO);
+                sessionMessage);
     }
 
 
@@ -137,12 +128,9 @@ public class ServiceUtil {
         String redisKeyPrefix = SessionIdUtil.getRedisKeyPrefixBySessionId(sessionId);
         assert redisKeyPrefix != null;
         stringRedisTemplate.opsForZSet().add(redisKeyPrefix + userId.toString(), sessionId, System.currentTimeMillis());
-        ChatSessionDTO chatSessionDTO = ChatSessionDTO.builder()
-                .sessionId(sessionId)
-                .lastActive(LocalDateTime.now())
-                .doType(ChatSessionDTO.UPDATE)
-                .build();
-        sendChatSession(chatSessionDTO);
+        SessionMessage sessionMessage = SessionMessage.createStatusUpdateMessage(
+                sessionId, userId, -1L, null, SessionMessage.STATUS_ACTIVE);
+        sendChatSession(sessionMessage);
     }
 
 

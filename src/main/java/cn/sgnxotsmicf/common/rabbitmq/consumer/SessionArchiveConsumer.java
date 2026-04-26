@@ -1,8 +1,11 @@
 package cn.sgnxotsmicf.common.rabbitmq.consumer;
 
-import cn.sgnxotsmicf.common.dto.ArchiveMessage;
+import cn.hutool.json.JSONUtil;
+import cn.sgnxotsmicf.common.rabbitmq.entity.ArchiveMessage;
 import cn.sgnxotsmicf.common.rabbitmq.constant.MqConst;
+import cn.sgnxotsmicf.common.rabbitmq.entity.MqFailMessage;
 import cn.sgnxotsmicf.common.rabbitmq.service.RabbitService;
+import cn.sgnxotsmicf.dao.MqFailMessageMapper;
 import cn.sgnxotsmicf.service.SessionArchiveService;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -15,10 +18,10 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 
 /**
  * 会话归档消息消费者
- *
  * 监听归档队列，处理会话归档逻辑
  * 使用手动ACK确认机制
  */
@@ -31,9 +34,10 @@ public class SessionArchiveConsumer {
 
     private final RabbitService rabbitService;
 
+    private final MqFailMessageMapper mqFailMessageMapper;
+
     /**
      * 消费归档消息
-     *
      * @param archiveMessage 归档消息
      * @param channel        RabbitMQ Channel
      * @param message        AMQP Message
@@ -54,7 +58,7 @@ public class SessionArchiveConsumer {
                                     ),
                                     @org.springframework.amqp.rabbit.annotation.Argument(
                                             name = "x-message-ttl",
-                                            value = "86400000",
+                                            value = "3600000",
                                             type = "java.lang.Integer"
                                     )
                             }
@@ -72,7 +76,6 @@ public class SessionArchiveConsumer {
 
         log.info("收到归档消息: messageId={}, sessionId={}, triggerType={}",
                 archiveMessage.getMessageId(), sessionId, archiveMessage.getTriggerType());
-
         try {
             // 幂等性检查
             if (sessionArchiveService.isSessionArchived(sessionId)) {
@@ -137,10 +140,29 @@ public class SessionArchiveConsumer {
 
         log.error("收到死信消息: sessionId={}, messageId={}", sessionId, archiveMessage.getMessageId());
 
-        // TODO: 将失败消息存入数据库，人工处理
-        // 发送告警通知等
+        try {
+            MqFailMessage failMsg = new MqFailMessage();
+            failMsg.setMessageId(archiveMessage.getMessageId());
+            failMsg.setExchange(MqConst.EXCHANGE_ARCHIVE);
+            failMsg.setRoutingKey(MqConst.ROUTING_ARCHIVE_SESSION);
+            failMsg.setMessageBody(JSONUtil.toJsonStr(archiveMessage));
+            failMsg.setFailReason("消费端处理失败进入死信: " +
+                    (archiveMessage.getRetryCount() >= 3 ? "超过最大重试次数" : "业务/系统异常"));
+            failMsg.setRetryCount(archiveMessage.getRetryCount());
+            failMsg.setStatus(0);
+            failMsg.setCreateTime(LocalDateTime.now());
+            failMsg.setUpdateTime(LocalDateTime.now());
 
-        // 确认消息
-        channel.basicAck(deliveryTag, false);
+            mqFailMessageMapper.insert(failMsg);
+
+            channel.basicAck(deliveryTag, false);
+            log.info("死信消息已入库并确认: sessionId={}", sessionId);
+
+        } catch (Exception e) {
+            log.error("死信消息入库失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
+            // 入库失败，NACK 不重新入队。TODO:需要额外处理
+            channel.basicNack(deliveryTag, false, false);
+        }
     }
+
 }

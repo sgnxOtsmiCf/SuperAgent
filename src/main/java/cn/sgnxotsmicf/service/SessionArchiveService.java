@@ -1,6 +1,6 @@
 package cn.sgnxotsmicf.service;
 
-import cn.sgnxotsmicf.common.dto.ArchiveMessage;
+import cn.sgnxotsmicf.common.rabbitmq.entity.ArchiveMessage;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.vo.ChatSessionVo;
 

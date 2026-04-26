@@ -174,3 +174,24 @@ CREATE TABLE `superagent_chat_message` (
                                            KEY `idx_session_id` (`session_id`),
                                            KEY `idx_message_time` (`message_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI对话消息表';
+
+
+-- mq消息失败类
+CREATE TABLE `superagent_mq_fail_message` (
+                                              `id`              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                                              `message_id`      VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '消息唯一标识（CorrelationData ID）',
+                                              `exchange`        VARCHAR(255) NOT NULL DEFAULT '' COMMENT '交换机名称',
+                                              `routing_key`     VARCHAR(255) NOT NULL DEFAULT '' COMMENT '路由键',
+                                              `message_body`    TEXT         COMMENT '消息体（JSON字符串）',
+                                              `fail_reason`     VARCHAR(500) NOT NULL DEFAULT '' COMMENT '失败原因',
+                                              `retry_count`     INT          NOT NULL DEFAULT 0 COMMENT '已重试次数',
+                                              `status`          TINYINT      NOT NULL DEFAULT 0 COMMENT '状态：0-待处理 1-已处理 2-已忽略',
+                                              `handler_remark`  VARCHAR(500) NOT NULL DEFAULT '' COMMENT '处理备注（人工填写）',
+                                              `create_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                              `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                                              `is_deleted`      tinyint      NOT NULL DEFAULT '0' COMMENT '逻辑删除',
+
+                                              INDEX `idx_status` (`status`),
+                                              INDEX `idx_message_id` (`message_id`),
+                                              INDEX `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQ发送失败消息记录表';

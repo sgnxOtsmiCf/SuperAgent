@@ -4,8 +4,6 @@ package cn.sgnxotsmicf.chatMemory;//
 //
 
 
-import cn.sgnxotsmicf.common.tools.AgentCommon;
-import cn.sgnxotsmicf.common.tools.SessionIdUtil;
 import com.alibaba.cloud.ai.memory.redis.BaseRedisChatMemoryRepository;
 import com.alibaba.cloud.ai.memory.redis.builder.RedisChatMemoryBuilder;
 import java.util.List;

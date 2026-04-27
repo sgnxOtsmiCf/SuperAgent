@@ -230,6 +230,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 .eq(User::getId, userId)
                 .eq(User::getIsDeleted, 0)
                 .one();
+
         if (user == null) {
             return Result.build(ResultCodeEnum.PERMISSION);
         }
@@ -290,13 +291,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         // 更新 top_k
-        if (userVo.getTop_k() != null) {
-            user.setTop_k(userVo.getTop_k());
+        if (userVo.getTopK() != null) {
+            user.setTopK(userVo.getTopK());
         }
 
         // 更新 top_p
-        if (userVo.getTop_p() != null) {
-            user.setTop_p(userVo.getTop_p());
+        if (userVo.getTopP() != null) {
+            user.setTopP(userVo.getTopP());
         }
 
         // 更新到数据库

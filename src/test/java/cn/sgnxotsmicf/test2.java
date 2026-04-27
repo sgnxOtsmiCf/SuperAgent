@@ -1,15 +1,13 @@
 package cn.sgnxotsmicf;
 
-import cn.sgnxotsmicf.app.superagent.SuperAgentFactory;
+import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import cn.sgnxotsmicf.common.tools.ServiceUtil;
-import cn.sgnxotsmicf.common.vo.ChatMessageVo;
 import cn.sgnxotsmicf.common.vo.ChatSessionVo;
 import cn.sgnxotsmicf.service.ChatSessionService;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
-import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.cloud.ai.graph.store.Store;
@@ -20,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * @Author: lixiang
@@ -62,7 +59,7 @@ public class test2 {
     @Test
     public void test1() throws GraphRunnerException {
         // 非流式调用测试
-        ReactAgent agent = superAgentFactory.createAgent(Map.of("id",1L));
+        ReactAgent agent = superAgentFactory.createAgent(Map.of("id",1L),"");
         Optional<OverAllState> result = agent.invoke("你是谁，1+1等于多少", RunnableConfig.builder().threadId("111").build());
         result.ifPresent(state -> {
             List<Message> messages = state.value("messages", List.class).orElse(Collections.emptyList());
@@ -74,8 +71,4 @@ public class test2 {
         });
     }
 
-    @Test
-    public void test2() throws GraphRunnerException {
-        Store store = superAgentFactory.buildRedisStore();
-    }
 }

@@ -29,7 +29,7 @@ public class ManusController {
     /**
      * 流式调用 Manus 超级智能体
      */
-    //@SaCheckLogin
+    @SaCheckLogin
     @Operation(summary = "流式调用manus agent")
     @PostMapping("/sse")
     public SseEmitter doChatWithSseEmitter(@RequestBody ChatRequest chatRequest) {

@@ -71,7 +71,7 @@ public class HookRegistry {
                 .build();
         return SkillsAgentHook.builder()
                 .skillRegistry(registry)
-                .autoReload(true)
+                .autoReload(false)
                 .build();
     }
 

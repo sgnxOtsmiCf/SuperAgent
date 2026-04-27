@@ -2,7 +2,7 @@ package cn.sgnxotsmicf.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
-import cn.sgnxotsmicf.app.superagent.SuperAgentFactory;
+import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import cn.sgnxotsmicf.chatMemory.NoSqlChatMemoryFactory;
 import cn.sgnxotsmicf.common.rabbitmq.entity.ArchiveMessage;
 import cn.sgnxotsmicf.common.po.ChatMessage;
@@ -11,7 +11,7 @@ import cn.sgnxotsmicf.common.rabbitmq.constant.MqConst;
 import cn.sgnxotsmicf.common.rabbitmq.service.RabbitService;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
-import cn.sgnxotsmicf.common.tools.AgentCommon;
+import cn.sgnxotsmicf.common.agent.AgentCommon;
 import cn.sgnxotsmicf.common.tools.ServiceUtil;
 import cn.sgnxotsmicf.common.tools.SessionIdUtil;
 import cn.sgnxotsmicf.common.vo.ChatMessageVo;

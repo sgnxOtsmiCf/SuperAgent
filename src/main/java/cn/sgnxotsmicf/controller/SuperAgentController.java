@@ -33,7 +33,7 @@ public class SuperAgentController {
     @Value("${ai.upload.allow-types:image/png,image/jpeg,image/jpg,image/webp,audio/mp3,audio/wav,video/mp4}")
     private List<String> allowTypes;
 
-    //@SaCheckLogin
+    @SaCheckLogin
     //@SaCheckPermission("agent:super:use")
     @PostMapping("/text/stream")
     public SseEmitter doChatStream(@RequestBody ChatRequest request) {

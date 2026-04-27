@@ -670,7 +670,7 @@ spring:
 - [ ] 完善前端 Markdown 渲染和交互体验
 - [ ] 完善Spring AI Alibaba不兼容的Message级别管理
 - [ ] 优化提示词及模型调用完整链路
-- [ ] 解决Sa-Token的流式输入异常问题
+- [x] 解决Sa-Token的流式输入异常问题
 - [ ] 支持用户自定义模型参数（温度、top_p、top_k 等）
 - [ ] 增加更多内置工具和技能
 - [ ] 优化 RAG 检索效果

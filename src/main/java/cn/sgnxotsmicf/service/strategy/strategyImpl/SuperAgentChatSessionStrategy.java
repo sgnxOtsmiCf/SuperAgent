@@ -1,8 +1,8 @@
 package cn.sgnxotsmicf.service.strategy.strategyImpl;
 
-import cn.sgnxotsmicf.app.superagent.SuperAgentFactory;
+import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
-import cn.sgnxotsmicf.common.tools.AgentCommon;
+import cn.sgnxotsmicf.common.agent.AgentCommon;
 import cn.sgnxotsmicf.common.tools.ServiceUtil;
 import cn.sgnxotsmicf.common.vo.ChatSessionVo;
 import cn.sgnxotsmicf.exception.AgentException;

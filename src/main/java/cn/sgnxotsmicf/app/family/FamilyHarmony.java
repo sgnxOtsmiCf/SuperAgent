@@ -1,6 +1,6 @@
 package cn.sgnxotsmicf.app.family;
 
-import cn.sgnxotsmicf.app.Prompt;
+import cn.sgnxotsmicf.common.agent.Prompt;
 import cn.sgnxotsmicf.app.manus.ToolCallAgent;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;

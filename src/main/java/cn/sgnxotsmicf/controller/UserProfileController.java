@@ -1,7 +1,7 @@
 package cn.sgnxotsmicf.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.sgnxotsmicf.app.superagent.SuperAgentFactory;
+import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import cn.sgnxotsmicf.app.superagent.hook.model.MemoryHook;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.vo.ProfileItemVo;

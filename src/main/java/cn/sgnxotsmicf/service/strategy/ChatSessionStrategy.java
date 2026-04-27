@@ -14,7 +14,7 @@ import java.util.List;
  * 以提供各自特定的会话存储、查询和删除逻辑。
  * </p>
  *
- * @author your_name
+ * @author sgnxotsmicf
  * @since 2026-04-17
  */
 public interface ChatSessionStrategy {

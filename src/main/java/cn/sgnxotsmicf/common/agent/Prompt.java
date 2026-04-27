@@ -1,4 +1,4 @@
-package cn.sgnxotsmicf.app;
+package cn.sgnxotsmicf.common.agent;
 
 /**
  * @Author: lixiang

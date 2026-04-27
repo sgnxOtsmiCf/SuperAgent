@@ -1,6 +1,5 @@
-package cn.sgnxotsmicf.app;
+package cn.sgnxotsmicf.app.manus;
 
-import cn.sgnxotsmicf.advisor.AgentLogAdvisor;
 import cn.sgnxotsmicf.advisor.ReActCompatibleMessageChatMemoryAdvisor;
 import cn.sgnxotsmicf.advisor.VectorStoreFactory;
 import jakarta.annotation.Resource;

@@ -33,7 +33,7 @@ public class UserVo implements Serializable {
 
     private BigDecimal temperature;
 
-    private BigDecimal top_k;
+    private BigDecimal topK;
 
-    private BigDecimal top_p;
+    private BigDecimal topP;
 }

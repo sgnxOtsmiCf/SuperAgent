@@ -4,7 +4,7 @@ import cn.sgnxotsmicf.chatMemory.CustomRedissonRedisChatMemoryRepository;
 import cn.sgnxotsmicf.chatMemory.MySqlChatMemoryRepository;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
-import cn.sgnxotsmicf.common.tools.AgentCommon;
+import cn.sgnxotsmicf.common.agent.AgentCommon;
 import cn.sgnxotsmicf.common.tools.ServiceUtil;
 import cn.sgnxotsmicf.common.tools.SessionIdUtil;
 import cn.sgnxotsmicf.common.vo.ChatMessageVo;

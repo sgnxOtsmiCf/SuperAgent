@@ -1,30 +1,21 @@
 package cn.sgnxotsmicf;
 
-import cn.sgnxotsmicf.agentTool.onlinetool.SmartWebFetchTool;
-import cn.sgnxotsmicf.app.superagent.SuperAgentFactory;
-import cn.sgnxotsmicf.common.tools.AgentCommon;
-import cn.sgnxotsmicf.common.vo.ChatMessageVo;
-import com.alibaba.cloud.ai.graph.OverAllState;
+import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
-import com.alibaba.dashscope.exception.NoSpecialTokenExists;
-import com.alibaba.dashscope.exception.UnSupportedSpecialTokenMode;
-import com.alibaba.dashscope.tokenizers.QwenTokenizer;
-import com.knuddels.jtokkit.Encodings;
-import com.knuddels.jtokkit.api.Encoding;
-import com.knuddels.jtokkit.api.ModelType;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.*;
+
+import static cn.sgnxotsmicf.common.model.ModelCommon.MODEL_QWEN_PLUS;
 
 /**
  * @Author: lixiang
@@ -117,7 +108,7 @@ public class test {
 
     @Test
     public void test3() throws GraphRunnerException {
-        ReactAgent reactAgent = superAgentFactory.createAgent(Map.of(),SuperAgentFactory.MODEL_QWEN_PLUS);
+        ReactAgent reactAgent = superAgentFactory.createAgent(Map.of(),MODEL_QWEN_PLUS);
         System.out.println(reactAgent.call("你好,你是哪一款模型",RunnableConfig.builder().threadId("1").build()).getText());
     }
 }

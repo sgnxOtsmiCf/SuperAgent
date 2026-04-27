@@ -25,7 +25,7 @@ public class FamilyHarmonyController {
      * @param chatRequest 请求
      * @return SseEmitter
      */
-    //@SaCheckLogin
+    @SaCheckLogin
     @PostMapping("/sse")
     @Operation(summary = "流式调用 FamilyHarmony 超级智能体")
     public SseEmitter doChatWithSseEmitter(@RequestBody ChatRequest chatRequest) {

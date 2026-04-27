@@ -44,10 +44,10 @@ public class User extends BaseEntity{
     private BigDecimal temperature;
 
     @TableField("top_k")
-    private BigDecimal top_k;
+    private BigDecimal topK;
 
     @TableField("top_p")
-    private BigDecimal top_p;
+    private BigDecimal topP;
 
     @TableField(exist = false)
     private List<String> permissionList;

@@ -1,4 +1,4 @@
-package cn.sgnxotsmicf.service.strategy.strategyImpl;
+package cn.sgnxotsmicf.service.strategy.session.strategyImpl;
 
 import cn.sgnxotsmicf.chatMemory.CustomRedissonRedisChatMemoryRepository;
 import cn.sgnxotsmicf.chatMemory.MySqlChatMemoryRepository;
@@ -12,8 +12,8 @@ import cn.sgnxotsmicf.common.vo.ChatSessionVo;
 import cn.sgnxotsmicf.exception.AgentException;
 import cn.sgnxotsmicf.service.ChatSessionService;
 import cn.sgnxotsmicf.service.SessionArchiveService;
-import cn.sgnxotsmicf.service.strategy.ChatSessionContext;
-import cn.sgnxotsmicf.service.strategy.ChatSessionStrategy;
+import cn.sgnxotsmicf.service.strategy.session.ChatSessionContext;
+import cn.sgnxotsmicf.service.strategy.session.ChatSessionStrategy;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;

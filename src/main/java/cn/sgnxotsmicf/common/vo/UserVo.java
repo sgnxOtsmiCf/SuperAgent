@@ -4,7 +4,6 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.math.BigDecimal;
 
 /**
  * @Author: lixiang
@@ -19,7 +18,7 @@ public class UserVo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    //private Long id;
+    private Long id;
 
     private String username;
 
@@ -29,11 +28,4 @@ public class UserVo implements Serializable {
 
     private String phone;
 
-    private String model;
-
-    private BigDecimal temperature;
-
-    private BigDecimal topK;
-
-    private BigDecimal topP;
 }

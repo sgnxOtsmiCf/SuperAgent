@@ -12,6 +12,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
+ * TODO:设置有问题，还未使用
  * 企业级 Markdown 转 PDF 工具
  * 适配 Spring AI Tool 规范，提供完整的转换、渲染、上传闭环能力。
  * 特性：支持中文字体防乱码注入、A4打印格式化、代码块与表格美化、配置外部化。
@@ -30,7 +32,7 @@ import java.io.InputStream;
 @Component
 public class MarkdownToPdfTool {
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     private MinioUtil minioUtil;
 
     @Value("${pdf.font.path:/fonts/SimSun.ttf}")
@@ -54,7 +56,7 @@ public class MarkdownToPdfTool {
                 this.fontBytesCache = fontStream.readAllBytes();
                 log.info("成功预加载中文字体: {}", fontPath);
             } else {
-                log.warn("未找到外部字体文件 {}，PDF可能无法正常显示中文", fontPath);
+                //log.warn("未找到外部字体文件 {}，PDF可能无法正常显示中文", fontPath);
             }
         } catch (IOException e) {
             log.error("加载字体文件失败", e);

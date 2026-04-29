@@ -27,6 +27,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.config.Config;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
@@ -47,31 +48,26 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SessionArchiveServiceImpl implements SessionArchiveService {
 
-    @Resource
-    private RabbitService rabbitService;
+
+    private final RabbitService rabbitService;
+
+    private final ChatSessionMapper chatSessionMapper;
+
+    private final ChatMessageService chatMessageService;
+
+    private final ServiceUtil serviceUtil;
+
+    private final SuperAgentFactory superAgentFactory;
+
+    private final NoSqlChatMemoryFactory noSqlChatMemoryFactory;
+
+    private final Config config;
 
     @Resource
-    private ChatSessionMapper chatSessionMapper;
-
-    @Resource
-    private ChatMessageService chatMessageService;
-
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Resource
-    private ServiceUtil serviceUtil;
-
-    @Resource
-    private SuperAgentFactory superAgentFactory;
-
-    @Resource
-    private NoSqlChatMemoryFactory noSqlChatMemoryFactory;
-
-    @Resource
-    private Config config;
+    private  StringRedisTemplate stringRedisTemplate;
 
     // ==================== 消息发送（生产者）====================
 

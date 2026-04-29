@@ -5,6 +5,7 @@ import cn.sgnxotsmicf.common.po.Permission;
 import cn.sgnxotsmicf.common.po.Role;
 import cn.sgnxotsmicf.dao.PermissionMapper;
 import cn.sgnxotsmicf.dao.RoleMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,13 +19,12 @@ import java.util.stream.Collectors;
  * @Description:
  */
 @Service
+@RequiredArgsConstructor
 public class StpInterfaceImpl implements StpInterface {
 
-    @Autowired
-    private PermissionMapper PermissionMapper;
+    private final PermissionMapper PermissionMapper;
 
-    @Autowired
-    private RoleMapper RoleMapper;
+    private final RoleMapper RoleMapper;
 
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {

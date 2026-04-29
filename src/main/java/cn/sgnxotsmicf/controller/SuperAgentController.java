@@ -2,6 +2,7 @@ package cn.sgnxotsmicf.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.stp.StpUtil;
+import cn.sgnxotsmicf.common.aop.RequestValidation;
 import cn.sgnxotsmicf.common.vo.ChatRequest;
 import cn.sgnxotsmicf.service.SuperAgentService;
 import jakarta.annotation.Resource;
@@ -36,9 +37,8 @@ public class SuperAgentController {
     @SaCheckLogin
     //@SaCheckPermission("agent:super:use")
     @PostMapping("/text/stream")
+    @RequestValidation(type = "full")
     public SseEmitter doChatStream(@RequestBody ChatRequest request) {
-        //这个bug还没有解决，简单做一个拦截判断
-        StpUtil.getLoginIdAsLong();
         return superAgentService.doChatStream(request);
     }
 

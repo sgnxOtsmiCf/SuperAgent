@@ -12,7 +12,9 @@ import java.util.List;
 
 @Data
 public class UserProfileVo {
+
     private Long userId;
+
     private List<ProfileItemVo> profiles;
 }
 

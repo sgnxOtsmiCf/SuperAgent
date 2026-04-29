@@ -13,6 +13,7 @@ import cn.sgnxotsmicf.service.ChatSessionService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -25,11 +26,11 @@ import java.util.List;
  * @Description:
  */
 @Service
+@RequiredArgsConstructor
 public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessage> implements ChatMessageService {
 
 
-    @Resource
-    private ChatSessionMapper chatSessionMapper;
+    private final ChatSessionMapper chatSessionMapper;
 
     @Override
     public Result<ChatMessageVo> getMessageByMessageId(String sessionId, Long messageId) {

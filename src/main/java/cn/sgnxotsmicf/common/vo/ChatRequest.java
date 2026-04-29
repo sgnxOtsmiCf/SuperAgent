@@ -1,6 +1,9 @@
 package cn.sgnxotsmicf.common.vo;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
+
+import java.math.BigDecimal;
 
 @Data
 public class ChatRequest {
@@ -20,5 +23,27 @@ public class ChatRequest {
      */
     private String modelId;
 
+    private Double temperature;
 
+    private Double topP;
+
+    /**
+     * 有些模型可能不支持
+     */
+    private Double topK;
+
+    private Long maxTokens;
+
+
+    private Long thinkingBudget;
+
+    /**
+     * 有些模型可能不支持
+     */
+    private Boolean enableThinking;
+
+    /**
+     * 有些模型可能不支持
+     */
+    private Boolean enableSearch;
 }

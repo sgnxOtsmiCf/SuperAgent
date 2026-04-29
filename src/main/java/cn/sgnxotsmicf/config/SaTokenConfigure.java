@@ -32,11 +32,10 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                         // 正常鉴权逻辑：仅对 REQUEST 分发生效
                         SaRouter.match("/**")
                                 .notMatch(
-                                        "/user/simpleLogin",
+                                        "/user/login",
                                         "/user/registerPre",
-                                        "/user/simpleRegister",
+                                        "/user/register",
                                         "/user/logout",
-                                        "/user/LoginWithPhoneCode",
                                         "/user/LoginWithPhoneCodePre",
                                         "/error",
                                         "/captcha/*"

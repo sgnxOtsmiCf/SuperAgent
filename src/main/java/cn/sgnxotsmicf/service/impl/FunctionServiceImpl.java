@@ -8,6 +8,7 @@ import cn.sgnxotsmicf.service.FunctionService;
 import com.alibaba.cloud.ai.graph.agent.hook.skills.SkillsAgentHook;
 import com.alibaba.cloud.ai.graph.skills.SkillMetadata;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
@@ -22,13 +23,12 @@ import java.util.List;
  */
 
 @Service
+@RequiredArgsConstructor
 public class FunctionServiceImpl implements FunctionService {
 
-    @Resource
-    private ToolRegistry toolRegistry;
+    private final ToolRegistry toolRegistry;
 
-    @Resource
-    private HookRegistry hookRegistry;
+    private final HookRegistry hookRegistry;
 
     @Override
     public Result<List<ToolVo>> getFunction() {

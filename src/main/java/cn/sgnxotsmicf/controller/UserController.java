@@ -6,6 +6,8 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.vo.UserVo;
 import cn.sgnxotsmicf.service.UserService;
+import cn.sgnxotsmicf.service.strategy.login.LoginContext;
+import cn.sgnxotsmicf.service.strategy.register.RegisterContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
@@ -24,30 +26,82 @@ public class UserController {
 
     private final UserService userService;
 
-
     public UserController(UserService userService) {
         this.userService = userService;
     }
 
     /**
-     * 用户登录-简单版
-     * @param username 用户名
-     * @param password 密码
+     * 统一登录入口
+     *
+     * @param loginType   登录类型：password / phone
+     * @param username    用户名（账号密码登录时必填）
+     * @param password    密码（账号密码登录时必填）
+     * @param phone       手机号（手机号登录时必填）
+     * @param captchaId   图片验证码ID
+     * @param captchaCode 图片验证码值
+     * @param verifyCode  短信验证码（手机号登录时必填）
      * @return SaTokenInfo
      */
-    @Operation(summary = "用户登录-简单版")
-    @PostMapping("/simpleLogin")
-    public Result<SaTokenInfo> doLogin(@RequestParam("username")String username,
-                                       @RequestParam("password")String password,
-                                       @RequestParam("captchaId")String captchaId,
-                                       @RequestParam("captchaCode")String captchaCode) {
-        return userService.doLogin(username, password, captchaId, captchaCode);
+    @Operation(summary = "用户登录-统一入口")
+    @PostMapping("/login")
+    public Result<SaTokenInfo> login(@RequestParam("loginType") String loginType,
+                                     @RequestParam(value = "username", required = false) String username,
+                                     @RequestParam(value = "password", required = false) String password,
+                                     @RequestParam(value = "phone", required = false) String phone,
+                                     @RequestParam("captchaId") String captchaId,
+                                     @RequestParam("captchaCode") String captchaCode,
+                                     @RequestParam(value = "verifyCode", required = false) String verifyCode) {
+        LoginContext context = LoginContext.builder()
+                .loginType(loginType)
+                .username(username)
+                .password(password)
+                .phone(phone)
+                .captchaId(captchaId)
+                .captchaCode(captchaCode)
+                .verifyCode(verifyCode)
+                .build();
+        return userService.login(context);
     }
+
+
+    /**
+     * 统一注册入口
+     *
+     * @param registerType 注册类型：password / phone
+     * @param username     用户名（账号密码注册时必填）
+     * @param password     密码（账号密码注册时必填）
+     * @param phone        手机号（手机号注册时必填）
+     * @param captchaId    图片验证码ID
+     * @param captchaCode  图片验证码值
+     * @param verifyCode   短信验证码（手机号注册时必填）
+     * @return 注册结果
+     */
+    @Operation(summary = "用户注册-简单版")
+    @PostMapping("/register")
+    public Result<String> register(@RequestParam("registerType") String registerType,
+                                   @RequestParam(value = "username", required = false) String username,
+                                   @RequestParam(value = "password", required = false) String password,
+                                   @RequestParam(value = "phone", required = false) String phone,
+                                   @RequestParam("captchaId") String captchaId,
+                                   @RequestParam("captchaCode") String captchaCode,
+                                   @RequestParam(value = "verifyCode", required = false) String verifyCode) {
+        RegisterContext context = RegisterContext.builder()
+                .registerType(registerType)
+                .username(username)
+                .password(password)
+                .phone(phone)
+                .captchaId(captchaId)
+                .captchaCode(captchaCode)
+                .verifyCode(verifyCode)
+                .build();
+        return userService.register(context);
+    }
+
 
     /**
      * 发送验证码
      * @param phone 手机号
-     * @return SaTokenInfo
+     * @return SaTokenInfo对象
      */
     @Operation(summary = "发送验证码")
     @PostMapping("/LoginWithPhoneCodePre")
@@ -55,31 +109,6 @@ public class UserController {
         return userService.doLoginWithPhoneCodePre(phone);
     }
 
-    /**
-     * 用户登录-手机号版
-     * @param phone 手机号
-     * @param verifyCode 验证码
-     * @return 登录SaTokenInfo
-     */
-    @Operation(summary = "用户登录-手机号版")
-    @PostMapping("/LoginWithPhoneCode")
-    public Result<SaTokenInfo> doLoginWithPhoneCode(@RequestParam("phone")String phone, @RequestParam("verifyCode")String verifyCode) {
-        return userService.doLoginWithPhoneCode(phone, verifyCode);
-    }
-
-    /*注册*/
-
-    /**
-     * 用户注册-简单版
-     * @param username 用户名
-     * @param password 密码
-     * @return String
-     */
-    @Operation(summary = "用户注册-简单版")
-    @PostMapping("/simpleRegister")
-    public Result<String> register(@RequestParam("username") String username,@RequestParam("password") String password) {
-        return userService.register(username,password);
-    }
 
     /**
      * 注册前动态校验用户名是否已经存在
@@ -105,7 +134,7 @@ public class UserController {
     }
 
     /**
-     *
+     * minio图片头像文件上传
      * @param file 用户图像
      * @return 响应地址
      */
@@ -118,7 +147,7 @@ public class UserController {
     }
 
     /**
-     *
+     * minio图片头像文件查询
      * @param userId 用户id
      * @return 响应地址
      */

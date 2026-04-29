@@ -3,11 +3,13 @@ package cn.sgnxotsmicf.app.superagent;
 import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
+import cn.sgnxotsmicf.common.vo.ChatRequest;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.dashscope.utils.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -25,23 +27,17 @@ import java.util.Map;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class SuperAgent {
 
     private final StreamingHandler streamingHandler;
 
     private final SuperAgentFactory superAgentFactory;
 
-    public SuperAgent(StreamingHandler streamingHandler, SuperAgentFactory superAgentFactory) {
-        this.streamingHandler = streamingHandler;
-        this.superAgentFactory = superAgentFactory;
-    }
-
-
-    public void doChatAgent(String message, String sessionId, SseEmitter emitter, Long userId, String userName) {
-        doChatAgent(message, sessionId, emitter, userId, userName, null);
-    }
-
-    public void doChatAgent(String message, String sessionId, SseEmitter emitter, Long userId, String userName, String modelId) {
+    public void doChatAgent(ChatRequest request, SseEmitter emitter, Long userId, String userName) {
+        String sessionId = request.getSessionId();
+        String modelId = request.getModelId();
+        String message = request.getMessage();
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(sessionId)
                 .addMetadata("userId", userId)
@@ -49,7 +45,7 @@ public class SuperAgent {
                 .store(superAgentFactory.buildRedisStore())
                 .build();
         try {
-            ReactAgent reactAgent = superAgentFactory.createAgent(Map.of("userId", userId, "userName", userName), modelId);
+            ReactAgent reactAgent = superAgentFactory.createAgent(Map.of("userId", userId, "userName", userName), request);
             Flux<NodeOutput> stream = reactAgent.stream(message, config);
             streamingHandler.handle(stream, emitter);
         } catch (GraphRunnerException e) {
@@ -57,4 +53,5 @@ public class SuperAgent {
             streamingHandler.sendError(emitter, JsonUtils.toJson(Result.build(ResultCodeEnum.AGENT_FAIL)));
         }
     }
+
 }

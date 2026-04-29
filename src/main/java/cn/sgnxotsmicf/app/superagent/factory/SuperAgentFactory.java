@@ -1,6 +1,7 @@
 package cn.sgnxotsmicf.app.superagent.factory;
 
 import cn.sgnxotsmicf.chatMemory.RedissonStore;
+import cn.sgnxotsmicf.common.vo.ChatRequest;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import com.alibaba.cloud.ai.graph.store.Store;
@@ -81,12 +82,14 @@ public class SuperAgentFactory {
      * 创建 Agent，根据 modelId 选择对应的模型
      *
      * @param toolContextConfig 工具上下文配置
-     * @param modelId           模型ID，为空时默认使用 qwen-plus
+     * @param request           ChatRequest 核心请求
      * @return ReactAgent ReactAgent的实例
      */
-    public ReactAgent createAgent(Map<String, Object> toolContextConfig, String modelId) {
+    public ReactAgent createAgent(Map<String, Object> toolContextConfig, ChatRequest request) {
+        String modelId = request.getModelId();
+        System.out.println("modelId: " + modelId);
         AbstractReactAgentCreator creator = resolveCreator(modelId);
-        return creator.createAgent(toolContextConfig, modelId);
+        return creator.createAgent(toolContextConfig, request);
     }
 
 
@@ -101,9 +104,12 @@ public class SuperAgentFactory {
 
         // 提取前缀：deepseek-chat -> deepseek
         String normalizedModelId = modelId.trim().toLowerCase();
-        String prefix = extractPrefix(normalizedModelId);
 
-        AbstractReactAgentCreator creator = prefixRouter.get(prefix);
+        AbstractReactAgentCreator creator = prefixRouter
+                .entrySet()
+                .stream()
+                .filter(entry -> normalizedModelId.startsWith(entry.getKey())).toList().getFirst().getValue();
+        //AbstractReactAgentCreator creator = prefixRouter.get(prefix);
 
         if (creator != null) {
             return creator;
@@ -118,14 +124,6 @@ public class SuperAgentFactory {
         return defaultCreator;
     }
 
-    /**
-     * 提取 modelId 前缀
-     * 规则：按第一个 '-' 分割，没有 '-' 则整个字符串作为前缀
-     */
-    private String extractPrefix(String modelId) {
-        int dashIndex = modelId.indexOf('-');
-        return dashIndex > 0 ? modelId.substring(0, dashIndex) : modelId;
-    }
 
     /**
      * 获取当前注册的所有前缀
@@ -137,7 +135,6 @@ public class SuperAgentFactory {
                         e -> e.getValue().getClass().getSimpleName()
                 ));
     }
-
 
 
     /**

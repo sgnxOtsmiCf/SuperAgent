@@ -1,4 +1,4 @@
-package cn.sgnxotsmicf.service.strategy;
+package cn.sgnxotsmicf.service.strategy.session;
 
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;

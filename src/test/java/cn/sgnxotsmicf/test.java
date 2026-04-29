@@ -2,10 +2,8 @@ package cn.sgnxotsmicf;
 
 import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
-import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.Checkpoint;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
-import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.Message;
@@ -15,7 +13,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.*;
 
-import static cn.sgnxotsmicf.common.model.ModelCommon.MODEL_QWEN_PLUS;
 
 /**
  * @Author: lixiang
@@ -106,9 +103,4 @@ public class test {
 //        System.out.println("=========================end===============================");
     }
 
-    @Test
-    public void test3() throws GraphRunnerException {
-        ReactAgent reactAgent = superAgentFactory.createAgent(Map.of(),MODEL_QWEN_PLUS);
-        System.out.println(reactAgent.call("你好,你是哪一款模型",RunnableConfig.builder().threadId("1").build()).getText());
-    }
 }

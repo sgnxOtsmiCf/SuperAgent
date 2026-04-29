@@ -7,14 +7,11 @@ import com.alibaba.cloud.ai.graph.agent.hook.HookPositions;
 import com.alibaba.cloud.ai.graph.agent.hook.ModelHook;
 import com.alibaba.cloud.ai.graph.store.Store;
 import com.alibaba.cloud.ai.graph.store.StoreItem;
-import com.alibaba.druid.support.profile.ProfileEntry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -33,8 +30,9 @@ import java.util.stream.Collectors;
 /**
  * @Author: lixiang
  * @CreateDate: 2026/4/19 20:48
- * @Version: 4.0
- * @Description: 动态用户画像记忆Hook，基于LLM进行增量事实提取与合并，支持时间衰减与容量淘汰
+ * @Version: 5.0
+ * @Description: 动态用户画像记忆Hook，基于LLM进行增量事实提取与合并，支持时间衰减与容量淘汰。
+ *               每个维度的值为原子条目列表(List<ProfileEntry>)，仅真正变更的条目刷新过期时间。
  */
 @Component
 @Slf4j
@@ -43,13 +41,10 @@ public class MemoryHook extends ModelHook {
 
     private static final String USER_PROFILE_NAMESPACE = "user_profiles";
 
-    // 画像最大保存条数，防止无限膨胀
     private static final int MAX_PROFILE_SIZE = 50;
 
-    // 画像过期时间：30天未更新则淘汰
     private static final long PROFILE_EXPIRE_DAYS = 30;
 
-    // 最小输入字数限制，少于该值不触发提取
     private static final int MIN_INPUT_LENGTH = 10;
 
     private static final String EXTRACTION_SYSTEM_PROMPT = """
@@ -59,6 +54,7 @@ public class MemoryHook extends ModelHook {
             如果当前用户输入中提取不到任何有效的偏好或属性信息，请务必输出空对象 {}。
             禁止输出Markdown标记或解释性文字，仅输出JSON本身。
             """;
+
     @Resource
     private ZhiPuAiChatModel zhiPuAiChatModel;
 
@@ -94,10 +90,16 @@ public class MemoryHook extends ModelHook {
                 }
                 long now = System.currentTimeMillis();
                 long expireMillis = TimeUnit.DAYS.toMillis(PROFILE_EXPIRE_DAYS);
-                Map<String, ProfileEntry> profileMap = parseRawProfileToMap(rawProfile);
+                Map<String, List<ProfileEntry>> profileMap = parseRawProfileToMap(rawProfile);
                 String userContext = profileMap.entrySet().stream()
-                        .filter(entry -> (now - entry.getValue().getUpdatedAt()) < expireMillis)
-                        .map(entry -> entry.getKey() + "=" + entry.getValue().getValue())
+                        .map(entry -> {
+                            String values = entry.getValue().stream()
+                                    .filter(e -> (now - e.getUpdatedAt()) < expireMillis)
+                                    .map(ProfileEntry::getValue)
+                                    .collect(Collectors.joining(", "));
+                            return values.isEmpty() ? null : entry.getKey() + "=" + values;
+                        })
+                        .filter(Objects::nonNull)
                         .collect(Collectors.joining(", ", "\n\n[当前用户画像上下文]\n", "\n请在后续回答中自然地参考这些信息。"));
                 if (userContext.trim().equals("[当前用户画像上下文]请在后续回答中自然地参考这些信息。")) {
                     return CompletableFuture.completedFuture(Map.of());
@@ -118,14 +120,11 @@ public class MemoryHook extends ModelHook {
                         existingText = existingText.substring(0, markerIndex);
                     }
                     SystemMessage enhancedSystemMessage = new SystemMessage(existingText + userContext);
-                    // 直接在原列表上替换，不通过返回值触发状态追加
                     messages.set(systemMessageIndex, enhancedSystemMessage);
                 } else {
                     SystemMessage enhancedSystemMessage = new SystemMessage(userContext);
-                    // 直接在原列表头部插入
-                    messages.add(0, enhancedSystemMessage);
+                    messages.addFirst(enhancedSystemMessage);
                 }
-                // 不返回 messages，避免框架当作增量追加导致记忆重复
                 return CompletableFuture.completedFuture(Map.of());
             }
         } catch (Exception e) {
@@ -142,7 +141,6 @@ public class MemoryHook extends ModelHook {
         }
 
         List<Message> messages = (List<Message>) state.value("messages").orElse(new ArrayList<>());
-        // 1. 只取当前轮次的用户输入作为提取源
         String currentUserInput = null;
         for (int i = messages.size() - 1; i >= 0; i--) {
             if (messages.get(i) instanceof UserMessage) {
@@ -150,39 +148,30 @@ public class MemoryHook extends ModelHook {
                 break;
             }
         }
-        // 2. 防御性检查：没有输入或输入字数少于10字，本轮不做画像提取
         if (currentUserInput == null || currentUserInput.trim().length() < MIN_INPUT_LENGTH) {
             log.debug("用户输入过短或为空，跳过画像提取, userId: {}", userId);
             return CompletableFuture.completedFuture(Map.of());
         }
-        // 异步执行：LLM 调用 + 持久化全部放到后台线程
         final String userIdStr = userId.toString();
         final String finalUserInput = currentUserInput;
         CompletableFuture.supplyAsync(() -> {
             try {
                 Store store = config.store();
                 Optional<StoreItem> itemOpt = store.getItem(List.of(USER_PROFILE_NAMESPACE), userIdStr);
-                Map<String, ProfileEntry> profileMap = (itemOpt.isPresent() && itemOpt.get().getValue() != null)
+                Map<String, List<ProfileEntry>> profileMap = (itemOpt.isPresent() && itemOpt.get().getValue() != null)
                         ? parseRawProfileToMap(itemOpt.get().getValue())
                         : new HashMap<>();
 
                 long now = System.currentTimeMillis();
                 long expireMillis = TimeUnit.DAYS.toMillis(PROFILE_EXPIRE_DAYS);
 
-                // 淘汰策略
-                profileMap.entrySet().removeIf(entry -> (now - entry.getValue().getUpdatedAt()) > expireMillis);
-                if (profileMap.size() > MAX_PROFILE_SIZE) {
-                    Map<String, ProfileEntry> sortedMap = profileMap.entrySet().stream()
-                            .sorted(Map.Entry.comparingByValue(Comparator.comparingLong(ProfileEntry::getUpdatedAt).reversed()))
-                            .limit(MAX_PROFILE_SIZE)
-                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
-                    profileMap.clear();
-                    profileMap.putAll(sortedMap);
-                }
+                expireStaleEntries(profileMap, now, expireMillis);
+                enforceCapacityLimit(profileMap);
 
-                // 构建 Prompt
                 String existingProfileDesc = profileMap.entrySet().stream()
-                        .map(e -> e.getKey() + ": " + e.getValue().getValue())
+                        .map(e -> e.getKey() + ": " + e.getValue().stream()
+                                .map(ProfileEntry::getValue)
+                                .collect(Collectors.joining(", ")))
                         .collect(Collectors.joining("\n"));
                 String userContent = String.format(
                         "已有的用户画像数据如下：\n%s\n\n当前用户输入：\n%s\n\n请结合已有画像和当前用户输入，输出更新后的完整用户画像JSON。如果当前输入无有效偏好，直接输出原画像。",
@@ -193,22 +182,22 @@ public class MemoryHook extends ModelHook {
                         new UserMessage(userContent)
                 ));
 
-                // LLM 调用（在后台线程中执行，不阻塞框架线程）
                 ChatResponse chatResponse = zhiPuAiChatModel.call(prompt);
                 String responseContent = chatResponse.getResult().getOutput().getText();
 
-                // 解析与增量合并
-                Map<String, String> deltaProfile = parseJsonToStringMap(responseContent);
-                if (!deltaProfile.isEmpty()) {
-                    deltaProfile.forEach((key, value) -> {
-                        profileMap.put(key, new ProfileEntry(value, now));
-                    });
-
-                    Map<String, Object> rawProfileToSave = new HashMap<>();
-                    profileMap.forEach((k, v) -> rawProfileToSave.put(k, objectMapper.convertValue(v, Map.class)));
-                    StoreItem item = StoreItem.of(List.of(USER_PROFILE_NAMESPACE), userIdStr, rawProfileToSave);
-                    store.putItem(item);
-                    log.info("成功增量更新用户画像, userId: {}, 更新字段: {}", userId, deltaProfile.keySet());
+                Map<String, String> llmResult = parseJsonToStringMap(responseContent);
+                if (!llmResult.isEmpty()) {
+                    boolean hasChanges = mergeFineGrained(profileMap, llmResult, now);
+                    if (hasChanges) {
+                        // 合并后清理空维度
+                        profileMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+                        Map<String, Object> rawProfileToSave = new HashMap<>(profileMap);
+                        StoreItem item = StoreItem.of(List.of(USER_PROFILE_NAMESPACE), userIdStr, rawProfileToSave);
+                        store.putItem(item);
+                        log.info("成功增量更新用户画像, userId: {}, 涉及维度: {}", userId, llmResult.keySet());
+                    } else {
+                        log.debug("用户画像无实质性变更, userId: {}", userId);
+                    }
                 }
             } catch (Exception e) {
                 log.error("提取或更新用户画像失败, userId: {}", userId, e);
@@ -218,19 +207,102 @@ public class MemoryHook extends ModelHook {
         return CompletableFuture.completedFuture(Map.of());
     }
 
+    private void expireStaleEntries(Map<String, List<ProfileEntry>> profileMap, long now, long expireMillis) {
+        profileMap.values().forEach(list -> list.removeIf(e -> (now - e.getUpdatedAt()) > expireMillis));
+        profileMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+    }
+
+    private void enforceCapacityLimit(Map<String, List<ProfileEntry>> profileMap) {
+        if (profileMap.size() <= MAX_PROFILE_SIZE) {
+            return;
+        }
+        Map<String, List<ProfileEntry>> sortedMap = profileMap.entrySet().stream()
+                .sorted(Map.Entry.<String, List<ProfileEntry>>comparingByValue(
+                                Comparator.comparingLong(list -> list.stream()
+                                        .mapToLong(ProfileEntry::getUpdatedAt)
+                                        .max()
+                                        .orElse(0L)))
+                        .reversed())
+                .limit(MAX_PROFILE_SIZE)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+        profileMap.clear();
+        profileMap.putAll(sortedMap);
+    }
+
     /**
-     * 解析带有时间戳的原始Map为内部结构
+     * 细粒度合并：将LLM返回的字符串值拆分后与已有条目逐项对比，
+     * 仅新增的条目使用当前时间戳，已有不变条目保留原有时间戳。
+     *
+     * @return true 表示画像发生了实质变更
      */
-    @SuppressWarnings("unchecked")
-    private Map<String, ProfileEntry> parseRawProfileToMap(Map<String, Object> rawProfile) {
-        Map<String, ProfileEntry> result = new HashMap<>();
+    private boolean mergeFineGrained(Map<String, List<ProfileEntry>> profileMap, Map<String, String> llmResult, long now) {
+        boolean hasChanges = false;
+        for (Map.Entry<String, String> deltaEntry : llmResult.entrySet()) {
+            String dimension = deltaEntry.getKey();
+            String newValueStr = deltaEntry.getValue();
+            List<String> newItems = splitValues(newValueStr);
+
+            List<ProfileEntry> existingItems = profileMap.getOrDefault(dimension, new ArrayList<>());
+            Set<String> existingValueSet = existingItems.stream()
+                    .map(ProfileEntry::getValue)
+                    .collect(Collectors.toSet());
+
+            boolean dimensionChanged = false;
+            List<ProfileEntry> mergedItems = new ArrayList<>();
+            for (String newItem : newItems) {
+                if (existingValueSet.contains(newItem)) {
+                    // 值未变，保留原有条目（含原有时间戳）
+                    existingItems.stream()
+                            .filter(e -> e.getValue().equals(newItem))
+                            .findFirst()
+                            .ifPresent(mergedItems::add);
+                } else {
+                    // 新增条目，使用当前时间戳
+                    mergedItems.add(new ProfileEntry(newItem, now));
+                    dimensionChanged = true;
+                }
+            }
+            // 检测条目是否被删除
+            if (mergedItems.size() != existingItems.size()) {
+                dimensionChanged = true;
+            }
+
+            if (dimensionChanged || !profileMap.containsKey(dimension)) {
+                profileMap.put(dimension, mergedItems);
+                hasChanges = true;
+            }
+        }
+        return hasChanges;
+    }
+
+    /**
+     * 将逗号分隔的字符串拆分为原子值列表（支持中英文逗号、顿号）
+     */
+    private List<String> splitValues(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(value.split("[，,、]"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 解析原始存储Map为 Map<String, List<ProfileEntry>>
+     */
+    private Map<String, List<ProfileEntry>> parseRawProfileToMap(Map<String, Object> rawProfile) {
+        Map<String, List<ProfileEntry>> result = new LinkedHashMap<>();
         rawProfile.forEach((key, val) -> {
             try {
-                if (val instanceof Map) {
-                    result.put(key, objectMapper.convertValue(val, ProfileEntry.class));
+                if (val instanceof List) {
+                    List<ProfileEntry> entries = objectMapper.convertValue(val, new TypeReference<List<ProfileEntry>>() {});
+                    if (entries != null) {
+                        result.put(key, entries);
+                    }
                 }
             } catch (Exception e) {
-                log.warn("画像字段 {} 解析失败，将被淘汰", key);
+                log.warn("画像维度 {} 解析失败，将被淘汰", key);
             }
         });
         return result;
@@ -251,7 +323,7 @@ public class MemoryHook extends ModelHook {
     }
 
     /**
-     * 画像条目元数据结构
+     * 画像原子条目：单个偏好/属性值 + 独立过期时间，以value判断相等性
      */
     @Setter
     @Getter
@@ -267,5 +339,41 @@ public class MemoryHook extends ModelHook {
             this.updatedAt = updatedAt;
         }
 
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof ProfileEntry that)) return false;
+            return Objects.equals(value, that.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(value);
+        }
     }
+
+    /* 目前存储的格式
+     * {
+     * "namespace":["user_profiles"],
+     * "key":"2",
+     * "value":{
+     *     "偏好领域":[
+     *         {"value":"中国古代历史","updatedAt":1777355210755},
+     *         {"value":"文言文","updatedAt":1777355210755}
+     *     ],
+     *     "求职方向":[
+     *         {"value":"Java后端开发实习","updatedAt":1777355210755}
+     *     ],
+     *     "技术偏好":[
+     *         {"value":"Java","updatedAt":1777355210755},
+     *         {"value":"caveman中等模式","updatedAt":1777355210755},
+     *         {"value":"Python","updatedAt":1777355210755},
+     *         {"value":"C++","updatedAt":1777355210755},
+     *         {"value":"并发编程","updatedAt":1777355210755}
+     *     ]
+     * },
+     * "createdAt":1777355218112,
+     * "updatedAt":1777355218112
+     * }
+     */
 }

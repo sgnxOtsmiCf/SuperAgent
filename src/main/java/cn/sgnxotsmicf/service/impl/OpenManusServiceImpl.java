@@ -15,6 +15,7 @@ import cn.sgnxotsmicf.service.ChatSessionService;
 import cn.sgnxotsmicf.service.OpenManusService;
 import cn.sgnxotsmicf.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
@@ -31,6 +32,7 @@ import java.util.List;
  * @Description:
  */
 @Service
+@RequiredArgsConstructor
 public class OpenManusServiceImpl implements OpenManusService {
 
     private final ChatSessionService chatSessionService;
@@ -45,20 +47,8 @@ public class OpenManusServiceImpl implements OpenManusService {
 
     private final ServiceUtil serviceUtil;
 
-    private final DeepSeekChatModel deepSeekChatModel;
-
     private final AdvisorRegister advisorRegister;
 
-    public OpenManusServiceImpl(ChatSessionService chatSessionService, FamilyHarmony familyHarmony, Manus manus, ChatClientFactory chatClientFactory, UserService userService, ServiceUtil serviceUtil, DeepSeekChatModel deepSeekChatModel, AdvisorRegister advisorRegister) {
-        this.chatSessionService = chatSessionService;
-        this.userService = userService;
-        this.chatClientFactory = chatClientFactory;
-        this.serviceUtil = serviceUtil;
-        this.familyHarmony = familyHarmony;
-        this.manus = manus;
-        this.deepSeekChatModel = deepSeekChatModel;
-        this.advisorRegister = advisorRegister;
-    }
 
     @Override
     public boolean sessionIdIsExist(String sessionId) {

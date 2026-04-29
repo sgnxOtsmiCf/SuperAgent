@@ -11,12 +11,12 @@ import cn.sgnxotsmicf.common.vo.ChatSessionVo;
 import cn.sgnxotsmicf.dao.ChatSessionMapper;
 import cn.sgnxotsmicf.service.ChatSessionService;
 import cn.sgnxotsmicf.service.SessionArchiveService;
-import cn.sgnxotsmicf.service.strategy.ChatSessionContext;
-import cn.sgnxotsmicf.service.strategy.ChatSessionStrategy;
-import cn.sgnxotsmicf.service.strategy.ChatSessionStrategyFactory;
+import cn.sgnxotsmicf.service.strategy.session.ChatSessionContext;
+import cn.sgnxotsmicf.service.strategy.session.ChatSessionStrategy;
+import cn.sgnxotsmicf.service.strategy.session.ChatSessionStrategyFactory;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.beans.BeanUtils;
@@ -37,22 +37,18 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSession> implements ChatSessionService {
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Resource
-    private MySqlChatMemoryRepository mysqlChatMemoryRepository;
+    private final MySqlChatMemoryRepository mysqlChatMemoryRepository;
 
-    @Resource
-    private ServiceUtil serviceUtil;
+    private final ServiceUtil serviceUtil;
 
-    @Resource
-    private SessionArchiveService sessionArchiveService;
+    private final SessionArchiveService sessionArchiveService;
 
-    @Resource
-    private ChatSessionStrategyFactory chatSessionStrategyFactory;
+    private final ChatSessionStrategyFactory chatSessionStrategyFactory;
 
     @Override
     public Result<List<ChatSessionVo>> getSessions(Long agentId) {

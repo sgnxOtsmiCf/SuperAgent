@@ -2,6 +2,7 @@ package cn.sgnxotsmicf.service.impl;
 
 
 import cn.sgnxotsmicf.app.superagent.SuperAgent;
+import cn.sgnxotsmicf.common.auth.UserInfoContext;
 import cn.sgnxotsmicf.common.vo.ChatRequest;
 import cn.sgnxotsmicf.common.po.User;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
@@ -12,6 +13,7 @@ import cn.sgnxotsmicf.service.SuperAgentService;
 import cn.sgnxotsmicf.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -24,19 +26,16 @@ import java.util.List;
  * @Description:
  */
 @Service
+@RequiredArgsConstructor
 public class SuperAgentServiceImpl implements SuperAgentService {
 
-    @Resource
-    private SuperAgent superAgent;
+    private final SuperAgent superAgent;
 
-    @Resource
-    private UserService userService;
+    private final UserService userService;
 
-    @Resource
-    private ServiceUtil serviceUtil;
+    private final ServiceUtil serviceUtil;
 
-    @Resource
-    private ChatSessionService chatSessionService;
+    private final ChatSessionService chatSessionService;
 
 
     @Override
@@ -44,7 +43,6 @@ public class SuperAgentServiceImpl implements SuperAgentService {
         String sessionId = request.getSessionId();
         String message = request.getMessage();
         Long agentId = request.getAgentId();
-        String modelId = request.getModelId();
         //创建 SSE 实例，设置超时时间（30分钟，避免长连接断开）
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
         //获取用户id
@@ -53,13 +51,14 @@ public class SuperAgentServiceImpl implements SuperAgentService {
         List<Object> objectList = serviceUtil.initSessionIdToUserIdOrUpdate(sessionId, userId, message, agentId, chatSessionService, emitter);
         emitter = (SseEmitter) objectList.getFirst();
         sessionId = objectList.getLast().toString();
-        //判断sessionId存在
+        //判断sessionId是否是该用户的
         boolean flag = serviceUtil.judgeSessionIdToUserIdIsExist(sessionId, userId);
         if (!flag) {
             throw new AgentException(ResultCodeEnum.SESSION_ID_NO_EXITS);
         }
         //调用模型
-        superAgent.doChatAgent(message, sessionId, emitter, userId, getUserNameByUserId(userId), modelId);
+        request.setSessionId(sessionId);
+        superAgent.doChatAgent(request, emitter, userId, UserInfoContext.getCurrentUsername());
         return emitter;
     }
 

@@ -1,8 +1,6 @@
-package cn.sgnxotsmicf.service.strategy;
+package cn.sgnxotsmicf.service.strategy.session;
 
 import cn.sgnxotsmicf.common.vo.ChatSessionVo;
-import cn.sgnxotsmicf.service.ChatSessionService;
-import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.List;
 

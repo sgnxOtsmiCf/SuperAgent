@@ -13,19 +13,18 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Redisson implementation of the Store interface using real Redis storage.
- * <p>
- * This implementation leverages Redisson's distributed capabilities for environments
- * requiring persistent and shared graph state. Uses SCAN for key pattern matching
- * to avoid blocking Redis in production.
- * </p>
- *
- * @author Your Name
- * @since 1.0.0.3
+ * @Author: lixiang
+ * @CreateDate: 2026/4/28 21:18
+ * @Version: 1.0
+ * @Description: 自实现Redis Store
  */
+
 public class RedissonStore extends BaseStore {
+
     private final RedissonClient redissonClient;
+
     private final ObjectMapper objectMapper;
+
     private final String keyPrefix;
 
     /**

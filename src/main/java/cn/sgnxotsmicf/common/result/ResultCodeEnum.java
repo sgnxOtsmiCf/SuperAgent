@@ -48,6 +48,8 @@ public enum ResultCodeEnum {
     BUCKET_CREATE_FAIL(506,"minio创建失败"),
     AGENT_FAIL(1001,"agent执行异常"),
     MODEL_FAIL(1002,"模型网络连接不稳定,请稍后重试"),
+    MODEL_CONFIG(1003,"模型配置不存在"),
+    PARAMETER_FAIL(4,"请求参数异常"),
 
     CAPTCHA_EMPTY(401,"验证码不能为空"),
     CAPTCHA_EXPIRED(402,"验证码已过期"),
@@ -55,9 +57,9 @@ public enum ResultCodeEnum {
     CAPTCHA_GENERATE_FAIL(404,"验证码生成失败")
     ;
 
-    private Integer code;
+    private final Integer code;
 
-    private String message;
+    private final String message;
 
     private ResultCodeEnum(Integer code, String message) {
         this.code = code;

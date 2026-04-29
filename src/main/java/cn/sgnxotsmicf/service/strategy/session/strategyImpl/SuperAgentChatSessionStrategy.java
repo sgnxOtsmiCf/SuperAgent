@@ -1,4 +1,4 @@
-package cn.sgnxotsmicf.service.strategy.strategyImpl;
+package cn.sgnxotsmicf.service.strategy.session.strategyImpl;
 
 import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
@@ -7,8 +7,8 @@ import cn.sgnxotsmicf.common.tools.ServiceUtil;
 import cn.sgnxotsmicf.common.vo.ChatSessionVo;
 import cn.sgnxotsmicf.exception.AgentException;
 import cn.sgnxotsmicf.service.ChatSessionService;
-import cn.sgnxotsmicf.service.strategy.ChatSessionContext;
-import cn.sgnxotsmicf.service.strategy.ChatSessionStrategy;
+import cn.sgnxotsmicf.service.strategy.session.ChatSessionContext;
+import cn.sgnxotsmicf.service.strategy.session.ChatSessionStrategy;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import jakarta.annotation.Resource;

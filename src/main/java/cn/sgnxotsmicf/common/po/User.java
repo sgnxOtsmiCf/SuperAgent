@@ -37,18 +37,6 @@ public class User extends BaseEntity{
     @TableField("user_status")
     private Integer userStatus;
 
-    @TableField("model")
-    private String model;
-
-    @TableField("temperature")
-    private BigDecimal temperature;
-
-    @TableField("top_k")
-    private BigDecimal topK;
-
-    @TableField("top_p")
-    private BigDecimal topP;
-
     @TableField(exist = false)
     private List<String> permissionList;
 

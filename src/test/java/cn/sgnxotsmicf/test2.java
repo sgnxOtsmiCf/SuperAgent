@@ -56,19 +56,4 @@ public class test2 {
         System.out.println(sessionVoList);
     }
 
-    @Test
-    public void test1() throws GraphRunnerException {
-        // 非流式调用测试
-        ReactAgent agent = superAgentFactory.createAgent(Map.of("id",1L),"");
-        Optional<OverAllState> result = agent.invoke("你是谁，1+1等于多少", RunnableConfig.builder().threadId("111").build());
-        result.ifPresent(state -> {
-            List<Message> messages = state.value("messages", List.class).orElse(Collections.emptyList());
-            if (!messages.isEmpty() && messages.get(messages.size() - 1) instanceof AssistantMessage msg) {
-                Object reasoning = msg.getMetadata().get("reasoningContent");
-                System.out.println("Reasoning: " + reasoning);
-            }
-            System.out.println(messages);
-        });
-    }
-
 }

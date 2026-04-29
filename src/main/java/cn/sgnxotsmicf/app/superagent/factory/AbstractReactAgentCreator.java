@@ -4,6 +4,7 @@ import cn.sgnxotsmicf.agentTool.ToolRegistry;
 import cn.sgnxotsmicf.app.superagent.hook.HookRegistry;
 import cn.sgnxotsmicf.app.superagent.interceptor.InterceptorRegistry;
 import cn.sgnxotsmicf.common.agent.Prompt;
+import cn.sgnxotsmicf.common.vo.ChatRequest;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import org.redisson.api.RedissonClient;
@@ -40,13 +41,13 @@ public abstract class AbstractReactAgentCreator {
     /**
      * 创建 ChatModel
      */
-    public abstract ChatModel createChatModel(String modelId);
+    public abstract ChatModel createChatModel(ChatRequest request);
 
     /**
      * 创建 ChatOptions
-     * @param modelId 模型Id
+     * @param request 请求参数
      */
-    public abstract ChatOptions createChatOptions(String modelId);
+    public abstract ChatOptions createChatOptions(ChatRequest request);
 
 
     /**
@@ -57,9 +58,11 @@ public abstract class AbstractReactAgentCreator {
     /**
      * 模板方法：创建 Agent
      */
-    public final ReactAgent createAgent(Map<String, Object> toolContextConfig, String modelId) {
-        ChatModel selectedModel = createChatModel(modelId);
-        ChatOptions selectedOptions = createChatOptions(modelId);
+    public final ReactAgent createAgent(Map<String, Object> toolContextConfig,  ChatRequest request) {
+        String modelId = request.getModelId();
+
+        ChatModel selectedModel = createChatModel(request);
+        ChatOptions selectedOptions = createChatOptions(request);
 
         return ReactAgent.builder()
                 .name(getAgentName())
@@ -75,33 +78,22 @@ public abstract class AbstractReactAgentCreator {
                 .build();
     }
 
-    /**
-     * 钩子方法：获取 Agent 名称
-     * 子类可覆盖
-     */
+
     protected String getAgentName() {
         return "SuperAgent";
     }
 
-    /**
-     * 钩子方法：获取系统提示词
-     * 子类可覆盖
-     */
+
     protected String getSystemPrompt() {
         return Prompt.SuperAgentSystemPrompt;
     }
 
-    /**
-     * 钩子方法：是否启用日志
-     * 子类可覆盖
-     */
+
     protected boolean isLoggingEnabled() {
         return true;
     }
 
-    /**
-     * 创建 RedisSaver
-     */
+
     public RedisSaver buildRedisSaver() {
         return RedisSaver.builder()
                 .redisson(redissonClient)

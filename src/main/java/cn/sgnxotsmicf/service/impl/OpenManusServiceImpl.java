@@ -77,13 +77,11 @@ public class OpenManusServiceImpl implements OpenManusService {
         // 初始化客户端
         if (AgentCommon.OpenManusId.equals(agentId)) {
             ChatClient chatClient = chatClientFactory.getChatClient(userId, getUserNameByUserId(userId), redisChatMemory, advisorRegister.buildAdvisors(manus.getMaxSteps()));
-            manus.setChatClient(chatClient);
-            return manus.runStream(message, sessionId, emitter);
+            return manus.runStream(message, sessionId, emitter, chatClient);
         }
         ChatClient chatClient = chatClientFactory
                 .getChatClient(userId, getUserNameByUserId(userId), redisChatMemory, advisorRegister.buildAdvisors(familyHarmony.getMaxSteps()), true);
-        familyHarmony.setChatClient(chatClient);
-        return familyHarmony.runStream(message, sessionId, emitter);
+        return familyHarmony.runStream(message, sessionId, emitter, chatClient);
     }
 
     private String getUserNameByUserId(Long userId) {

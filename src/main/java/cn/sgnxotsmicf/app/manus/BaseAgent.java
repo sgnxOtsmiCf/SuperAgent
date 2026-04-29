@@ -30,9 +30,8 @@ public abstract class BaseAgent {
 
     private int maxSteps = 10;
 
-    private ChatClient chatClient;
-
-    public String run(AgentContext context, String userPrompt) {
+    public String run(AgentContext context, String userPrompt, ChatClient chatClient) {
+        context.setChatClient(chatClient);
         if (context.getState() != AgentState.IDLE) {
             throw new RuntimeException("Cannot run agent from state: " + context.getState());
         }
@@ -65,11 +64,12 @@ public abstract class BaseAgent {
         }
     }
 
-    public SseEmitter runStream(String userPrompt, String sessionId, SseEmitter emitter) {
+    public SseEmitter runStream(String userPrompt, String sessionId, SseEmitter emitter, ChatClient chatClient) {
         if ((sessionId == null || sessionId.isBlank())) {
             throw new AgentException(ResultCodeEnum.AGENT_SESSION_EMPTY);
         }
         AgentContext context = new AgentContext(sessionId);
+        context.setChatClient(chatClient);
         String tokenValue = StpUtil.getTokenValue();
 
         // 设置流式消息消费者，用于实时发送SSE消息

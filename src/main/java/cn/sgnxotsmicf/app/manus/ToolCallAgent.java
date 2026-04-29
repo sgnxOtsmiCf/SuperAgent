@@ -42,11 +42,6 @@ public class ToolCallAgent extends ReActAgent {
 
     private final ChatOptions chatOptions;
 
-    /**
-     * 流式消息消费者，用于实时发送SSE消息
-     */
-    private volatile Consumer<AgentMessage> streamMessageConsumer;
-
     public ToolCallAgent(ToolCallback[] availableTools) {
         super();
         this.availableTools = availableTools;
@@ -62,17 +57,10 @@ public class ToolCallAgent extends ReActAgent {
 
 
     /**
-     * 设置流式消息消费者
-     */
-    public void setStreamMessageConsumer(Consumer<AgentMessage> consumer) {
-        this.streamMessageConsumer = consumer;
-    }
-
-    /**
      * 发送流式消息，如果消费者存在则直接发送，否则添加到上下文队列
      */
     private void sendStreamMessage(AgentContext context, AgentMessage message) {
-        Consumer<AgentMessage> consumer = this.streamMessageConsumer;
+        Consumer<AgentMessage> consumer = context.getStreamMessageConsumer();
         if (consumer != null) {
             try {
                 consumer.accept(message);
@@ -117,7 +105,7 @@ public class ToolCallAgent extends ReActAgent {
             AtomicReference<Map<String, Object>> metadataRef = new AtomicReference<>(new HashMap<>());
 
             // 使用流式调用
-            Flux<ChatResponse> streamResponse = getChatClient().prompt(prompt)
+            Flux<ChatResponse> streamResponse = context.getChatClient().prompt(prompt)
                     .system(getSystemPrompt())
                     .toolCallbacks(availableTools)
                     .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, context.getSessionId())
@@ -268,7 +256,7 @@ public class ToolCallAgent extends ReActAgent {
      */
     @Override
     protected void setupStreamMessageConsumer(SseEmitter emitter, AgentContext context) {
-        this.setStreamMessageConsumer(message -> {
+        context.setStreamMessageConsumer(message -> {
             try {
                 emitter.send(SseEmitter.event()
                         .name(message.getType())

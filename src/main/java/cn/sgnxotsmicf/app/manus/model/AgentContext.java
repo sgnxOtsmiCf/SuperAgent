@@ -2,6 +2,7 @@ package cn.sgnxotsmicf.app.manus.model;
 
 import cn.sgnxotsmicf.app.manus.AgentMessage;
 import lombok.Data;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatResponse;
 
@@ -9,6 +10,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.function.Consumer;
 
 @Data
 public class AgentContext {
@@ -27,6 +29,10 @@ public class AgentContext {
     private String sessionId;
 
     private ChatResponse toolCallChatResponse;
+
+    private ChatClient chatClient;
+
+    private Consumer<AgentMessage> streamMessageConsumer;
 
     public AgentContext(String sessionId) {
         this.sessionId = sessionId;

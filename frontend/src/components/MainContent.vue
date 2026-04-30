@@ -1110,7 +1110,7 @@ function handleError(error) {
 
             p {
               margin-bottom: 1.4em;
-              text-align: justify;
+              text-align: left;
               
               &:last-child {
                 margin-bottom: 0;

@@ -59,7 +59,9 @@ export const useChatStore = defineStore('chat', () => {
     topP: 0.9,
     topK: 10,
     maxTokens: 200000,
-    thinkingBudget: 0
+    thinkingBudget: 0,
+    enableThinking: false,
+    enableSearch: false
   })
 
   const defaultConfigLoaded = ref(false)
@@ -1270,7 +1272,10 @@ export const useChatStore = defineStore('chat', () => {
           temperature: cfg.temperature != null ? Number(cfg.temperature) : 0.75,
           topP: cfg.topP != null ? Number(cfg.topP) : 0.9,
           topK: cfg.topK != null ? Number(cfg.topK) : 10,
-          maxTokens: cfg.maxTokens != null ? Number(cfg.maxTokens) : 200000
+          maxTokens: cfg.maxTokens != null ? Number(cfg.maxTokens) : 200000,
+          thinkingBudget: cfg.thinkingBudget != null ? Number(cfg.thinkingBudget) : 0,
+          enableThinking: cfg.enableThinking != null ? Boolean(cfg.enableThinking) : false,
+          enableSearch: cfg.enableSearch != null ? Boolean(cfg.enableSearch) : false
         }
       }
     } catch (error) {

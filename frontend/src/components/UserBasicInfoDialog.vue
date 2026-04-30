@@ -193,7 +193,10 @@ const formData = reactive({
   temperature: 0.7,
   top_k: 50,
   top_p: 0.9,
-  max_tokens: 200000
+  max_tokens: 200000,
+  thinking_budget: 0,
+  enable_thinking: false,
+  enable_search: false
 })
 
 // 初始化表单数据
@@ -215,6 +218,9 @@ async function loadModelConfig() {
       formData.top_k = res.data.topK !== undefined ? Number(res.data.topK) : 50
       formData.top_p = res.data.topP !== undefined ? Number(res.data.topP) : 0.9
       formData.max_tokens = res.data.maxTokens !== undefined ? Number(res.data.maxTokens) : 200000
+      formData.thinking_budget = res.data.thinkingBudget !== undefined ? Number(res.data.thinkingBudget) : 0
+      formData.enable_thinking = res.data.enableThinking !== undefined ? Boolean(res.data.enableThinking) : false
+      formData.enable_search = res.data.enableSearch !== undefined ? Boolean(res.data.enableSearch) : false
     }
   } catch (error) {
     console.error('获取模型配置失败:', error)
@@ -378,7 +384,10 @@ async function saveAIParams() {
       temperature: formData.temperature,
       topK: formData.top_k,
       topP: formData.top_p,
-      maxTokens: formData.max_tokens
+      maxTokens: formData.max_tokens,
+      thinkingBudget: formData.thinking_budget,
+      enableThinking: formData.enable_thinking,
+      enableSearch: formData.enable_search
     }
 
     const res = await modelApi.saveModelConfig(config)

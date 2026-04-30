@@ -1,9 +1,9 @@
 <template>
   <div
-    class="markdown-renderer"
-    ref="rendererRef"
-    v-html="renderedHtml"
-    @click="handleRendererClick"
+      class="markdown-renderer"
+      ref="rendererRef"
+      v-html="renderedHtml"
+      @click="handleRendererClick"
   ></div>
 </template>
 
@@ -48,16 +48,16 @@ marked.setOptions({
 // 预处理 LaTeX 公式，将其转换为占位符
 function preprocessLatex(content) {
   if (!content) return { content: '', formulas: [] }
-  
+
   // 保存公式的数组
   const formulas = []
-  
+
   // 处理块级公式 $$...$$
   content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
     formulas.push({ type: 'block', formula: formula.trim() })
     return `__LATEX_BLOCK_${formulas.length - 1}__`
   })
-  
+
   // 处理行内公式 $...$（排除转义的 \$ 和表情符号如 ✅）
   // 使用更严格的匹配：公式应该包含数学相关字符
   content = content.replace(/(?<!\\)\$([\s\S]*?)(?<!\\)\$/g, (match, formula) => {
@@ -71,7 +71,7 @@ function preprocessLatex(content) {
     // 否则保留原始内容
     return match
   })
-  
+
   return { content, formulas }
 }
 
@@ -85,24 +85,24 @@ function renderLatex(formula, isBlock = false) {
     })
   } catch (error) {
     console.warn('[MarkdownRenderer] LaTeX render error:', error)
-    return isBlock 
-      ? `<div class="latex-error">$$${formula}$$</div>`
-      : `<span class="latex-error">$${formula}$</span>`
+    return isBlock
+        ? `<div class="latex-error">$$${formula}$$</div>`
+        : `<span class="latex-error">$${formula}$</span>`
   }
 }
 
 // 后处理，将占位符替换为渲染后的公式
 function postprocessLatex(content, formulas) {
   if (!formulas || formulas.length === 0) return content
-  
+
   formulas.forEach((item, index) => {
-    const placeholder = item.type === 'block' 
-      ? `__LATEX_BLOCK_${index}__`
-      : `__LATEX_INLINE_${index}__`
+    const placeholder = item.type === 'block'
+        ? `__LATEX_BLOCK_${index}__`
+        : `__LATEX_INLINE_${index}__`
     const rendered = renderLatex(item.formula, item.type === 'block')
     content = content.replace(placeholder, rendered)
   })
-  
+
   return content
 }
 
@@ -157,6 +157,147 @@ function hasTableStructure(content) {
   return false
 }
 
+function closeOpenCodeFence(content) {
+  const fenceRe = /^([ \t]*)(```+|~~~+)/gm
+  const fences = []
+  let match
+  while ((match = fenceRe.exec(content)) !== null) {
+    fences.push({ indent: match[1], backticks: match[2], pos: match.index })
+  }
+  if (fences.length === 0 || fences.length % 2 === 0) return content
+  const lastOpen = fences[fences.length - 1]
+  return content + '\n' + lastOpen.indent + lastOpen.backticks
+}
+
+function detectBlockContext(content) {
+  if (!content) return { inCodeBlock: false, inBlockquote: false, inList: false, listDepth: 0 }
+
+  const lines = content.split('\n')
+  let inCodeBlock = false
+  let inBlockquote = false
+  let inList = false
+  let listDepth = 0
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    const fenceMatch = line.match(/^([ \t]*)(```+|~~~+)/)
+    if (fenceMatch) {
+      inCodeBlock = !inCodeBlock
+      continue
+    }
+    if (inCodeBlock) continue
+
+    if (/^(\s*)>\s?/.test(line)) {
+      inBlockquote = true
+      continue
+    }
+
+    const listMatch = line.match(/^(\s*)([-*+]|\d+[.)])\s/)
+    if (listMatch) {
+      inList = true
+      inBlockquote = false
+      listDepth = Math.floor(listMatch[1].length / 2) + 1
+      continue
+    }
+
+    // 缩进内容（列表项延续），保持当前状态
+    if (/^\s{2,}\S/.test(line)) {
+      continue
+    }
+
+    // 非缩进非特殊行：重置引用；标题/分割线则同时重置列表
+    inBlockquote = false
+    if (/^(#{1,6}\s|[-*_]{3,}\s*$)/.test(line)) {
+      inList = false
+      listDepth = 0
+    }
+  }
+
+  return { inCodeBlock, inBlockquote, inList, listDepth }
+}
+
+function sanitizeUnstableLine(line, blockContext) {
+  if (!line) return line
+
+  const ctx = blockContext || { inCodeBlock: false, inBlockquote: false, inList: false, listDepth: 0 }
+  if (ctx.inCodeBlock) return line
+
+  const trimmed = line.trim()
+
+  // 标题：流式过程中几乎总是不完整的，插入零宽空格阻止 marked 解析为标题
+  if (/^#{1,6}\s/.test(line)) {
+    return line.replace(/^(#{1,6})(\s)/, '$1​$2')
+  }
+
+  // 无序列表标记：不在列表中时用反斜杠转义
+  const ulMatch = line.match(/^(\s*)([-*+])(\s)/)
+  if (ulMatch) {
+    if (!ctx.inList) {
+      return line.replace(/^(\s*)([-*+])(\s)/, '$1\\$2$3')
+    }
+    return line
+  }
+
+  // 有序列表标记：不在列表中时用反斜杠转义
+  const olMatch = line.match(/^(\s*)(\d+[.)])(\s)/)
+  if (olMatch) {
+    if (!ctx.inList) {
+      return line.replace(/^(\s*)(\d+[.)])(\s)/, '$1\\$2$3')
+    }
+    return line
+  }
+
+  // 引用：不在引用块中时转义
+  if (/^(\s*)>\s/.test(line) && !ctx.inBlockquote) {
+    return line.replace(/^(\s*)(>)(\s)/, '$1\\$2$3')
+  }
+
+  // 代码围栏：不稳定行中出现几乎总是意外，转义
+  if (/^[ \t]*```/.test(line) || /^[ \t]*~~~/.test(line)) {
+    return line.replace(/^([ \t]*)(```+|~~~+)/, '$1\\`\\`\\`')
+  }
+
+  // 表格管道：转义
+  if (/^(\s*)\|/.test(line)) {
+    return line.replace(/^(\s*)(\|)/, '$1\\$2')
+  }
+
+  // 水平分割线
+  if (/^(-{3,}|_{3,}|\*{3,})\s*$/.test(trimmed)) {
+    return line.replace(/^(\s*)([-_*]{3,})/, '$1\\$2')
+  }
+
+  return line
+}
+
+// 常见 HTML 标签白名单，用于安全闭合未闭合标签
+const KNOWN_HTML_TAGS = new Set([
+  'div', 'span', 'p', 'a', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  'ul', 'ol', 'li', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'code', 'pre', 'blockquote', 'em', 'strong', 'del', 'ins', 'sub', 'sup',
+  'section', 'article', 'header', 'footer', 'nav', 'main', 'aside',
+  'details', 'summary', 'input', 'button', 'select', 'option', 'textarea',
+  'dl', 'dt', 'dd', 'figure', 'figcaption', 'caption', 'colgroup', 'col',
+  'iframe', 'video', 'audio', 'source'
+])
+
+function closeOpenHtmlTag(content) {
+  const openTagRe = /<([a-zA-Z][a-zA-Z0-9]*)((?:\s+(?:[a-zA-Z][a-zA-Z0-9-]*(?:=(?:"[^"]*"|'[^']*'|\{[^\}]*\}|[^\s>]*))?))*)\s*>?$/g
+  let match
+  let lastMatch = null
+  while ((match = openTagRe.exec(content)) !== null) {
+    lastMatch = { index: match.index, tagName: match[1].toLowerCase(), fullMatch: match[0] }
+  }
+
+  if (!lastMatch) return content
+  if (!KNOWN_HTML_TAGS.has(lastMatch.tagName)) return content
+  if (lastMatch.fullMatch.endsWith('>')) return content
+
+  return content + '>'
+}
+
 function preprocessIncompleteMarkdown(content, streaming = false) {
   if (!content) return ''
   let processed = content
@@ -173,12 +314,17 @@ function preprocessIncompleteMarkdown(content, streaming = false) {
       unstablePart = processed.substring(lastNewlineIndex + 1)
     }
 
+    // 先修复稳定部分的块级结构（代码围栏闭合等）
     if (stablePart) {
       stablePart = applyAllMarkdownFixes(stablePart)
     }
 
+    // 基于修复后的稳定部分检测块级上下文
+    const blockContext = stablePart ? detectBlockContext(stablePart) : null
+
+    // 不稳定部分：先转义块级语法冲突，再修复内联元素
     if (unstablePart) {
-      unstablePart = applyInlineOnlyFixes(unstablePart)
+      unstablePart = applyInlineOnlyFixes(unstablePart, blockContext)
     }
 
     return stablePart + unstablePart
@@ -188,15 +334,12 @@ function preprocessIncompleteMarkdown(content, streaming = false) {
 }
 
 function applyAllMarkdownFixes(processed) {
-  // 1. 修复不完整的代码块
-  const codeBlockCount = (processed.match(/```/g) || []).length
-  if (codeBlockCount % 2 !== 0) {
-    processed += '\n```'
-  }
+  // 1. 修复不完整的代码块（保留缩进，避免破坏列表/引用嵌套）
+  processed = closeOpenCodeFence(processed)
 
-  // 2. 修复可能被截断的列表项
-  processed = processed.replace(/^(\s*[-*]\s*)$/gm, '$1 ')
-  processed = processed.replace(/^(\s*\d+\.\s*)$/gm, '$1 ')
+  // 2. 修复可能被截断的列表项（支持 - * + 和 1. 1) 样式）
+  processed = processed.replace(/^(\s*[-*+]\s*)$/gm, '$1 ')
+  processed = processed.replace(/^(\s*\d+[.)]\s*)$/gm, '$1 ')
 
   // 3. 修复可能被截断的标题
   processed = processed.replace(/^(#{1,6})$/gm, '$1 ')
@@ -237,12 +380,18 @@ function applyAllMarkdownFixes(processed) {
   // 9. 修复不完整的表格行
   if (hasTableStructure(processed)) {
     const lines = processed.split('\n')
-    const lastLine = lines[lines.length - 1]
-    if (lastLine && lastLine.includes('|') && !lastLine.trim().endsWith('|')) {
-      const trimmedLastLine = lastLine.trim()
-      if (!/^\s*\|?[-:\s|]+[-:\s|]+\|?\s*$/.test(trimmedLastLine)) {
-        lines[lines.length - 1] = lastLine + ' |'
-        processed = lines.join('\n')
+    let lastLineIdx = lines.length - 1
+    while (lastLineIdx >= 0 && !lines[lastLineIdx].trim()) {
+      lastLineIdx--
+    }
+    if (lastLineIdx >= 0) {
+      const lastLine = lines[lastLineIdx]
+      if (lastLine && lastLine.includes('|') && !lastLine.trim().endsWith('|')) {
+        const trimmedLastLine = lastLine.trim()
+        if (!/^\s*\|?[-:\s|]+[-:\s|]+\|?\s*$/.test(trimmedLastLine)) {
+          lines[lastLineIdx] = lastLine + ' |'
+          processed = lines.join('\n')
+        }
       }
     }
   }
@@ -250,22 +399,15 @@ function applyAllMarkdownFixes(processed) {
   // 10. 修复不完整的引用块
   processed = processed.replace(/^(\s*>\s*)$/gm, '$1 ')
 
-  // 11. 修复可能被截断的 HTML 标签
-  const lastOpenBracket = processed.lastIndexOf('<')
-  if (lastOpenBracket !== -1) {
-    const afterBracket = processed.slice(lastOpenBracket)
-    if (/^<[a-zA-Z][a-zA-Z0-9]*(?:\s+[a-zA-Z][a-zA-Z0-9-]*(?:=(?:"[^"]*"|'[^']*'|[^\s>]*))?)*\s*>?$/.test(afterBracket)) {
-      if (!afterBracket.endsWith('>')) {
-        processed += '>'
-      }
-    }
-  }
+  // 11. 修复可能被截断的 HTML 标签（仅白名单标签，避免误匹配比较运算符）
+  processed = closeOpenHtmlTag(processed)
 
   return processed
 }
 
-function applyInlineOnlyFixes(processed) {
-  // 对于正在输入的行(incomplete line)，只修复内联元素，避免多行结构的错误闭合
+function applyInlineOnlyFixes(line, blockContext) {
+  // 对于正在输入的行(incomplete line)，先转义可能破坏块结构的语法
+  let processed = sanitizeUnstableLine(line, blockContext)
 
   // 1. 修复不完整的行内代码
   const backtickCount = (processed.match(/`/g) || []).length
@@ -323,11 +465,11 @@ function applyInlineOnlyFixes(processed) {
 
 function escapeHtml(value) {
   return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
 }
 
 function renderCodeBlock(code, infostring) {
@@ -422,6 +564,76 @@ async function handleRendererClick(event) {
   }
 }
 
+// 关闭未闭合的内联格式（bold、italic、inline code、links）
+// 仅处理内联元素，不处理块级结构 — 配合 marked.parseInline() 使用
+function closeInlineFormatting(text) {
+  if (!text) return text
+  let result = text
+
+  // 1. 闭合粗体（**）
+  const doubleAsteriskCount = (result.match(/\*\*/g) || []).length
+  if (doubleAsteriskCount % 2 !== 0) result += '**'
+
+  // 2. 闭合粗体（__）
+  const doubleUnderscoreCount = (result.match(/__/g) || []).length
+  if (doubleUnderscoreCount % 2 !== 0) result += '__'
+
+  // 3. 闭合斜体（*），排除列表标记和已配对的情况
+  const singleAsteriskCount = countNonListAsterisks(result)
+  if (singleAsteriskCount % 2 !== 0) result += '*'
+
+  // 4. 闭合斜体（_），仅单词边界的下划线
+  const singleUnderscoreCount = countNonWordUnderscores(result)
+  if (singleUnderscoreCount % 2 !== 0) result += '_'
+
+  // 5. 闭行内代码
+  const backtickCount = (result.match(/`/g) || []).length
+  if (backtickCount % 2 !== 0) result += '`'
+
+  // 6. 闭合未完成的链接/图片 [text](url 或 ![alt](url
+  const lastParenOpen = result.lastIndexOf('](')
+  if (lastParenOpen !== -1) {
+    const rest = result.substring(lastParenOpen + 2)
+    if (!rest.includes(')')) {
+      result += ')'
+    }
+  }
+
+  return result
+}
+
+function isCompleteBlockLine(line, stablePart) {
+  if (!line || !line.trim()) return false
+
+  const trimmed = line.trim()
+
+  const blockContext = detectBlockContext(stablePart)
+  if (blockContext.inCodeBlock) return true
+
+  if (/^#{1,6}\s+.+/.test(trimmed)) return true
+
+  if (/^\s*[-*+]\s+.+/.test(line)) return true
+
+  if (/^\s*\d+[.)]\s+.+/.test(line)) return true
+
+  if (/^>+\s+.+/.test(trimmed)) return true
+
+  if (/^(-{3,}|_{3,}|\*{3,})\s*$/.test(trimmed)) return true
+
+  if (/^\|?[\s:-]+\|[\s|:-]+\|?\s*$/.test(trimmed) && /[-:]/.test(trimmed)) return true
+
+  if (trimmed.includes('|')) {
+    const pipeCount = (trimmed.match(/\|/g) || []).length
+    if (hasTableStructure(stablePart) && pipeCount >= 1) return true
+    if (/^\|/.test(trimmed) && pipeCount >= 2) return true
+    if (pipeCount >= 3) return true
+  }
+
+  if (blockContext.inList && /^\s{2,}\S/.test(line)) return true
+
+  return false
+}
+
 function renderMarkdown(markdown, streaming = false) {
   if (!markdown || markdown.trim() === '') {
     return ''
@@ -430,22 +642,64 @@ function renderMarkdown(markdown, streaming = false) {
   try {
     // 1. 预处理 LaTeX 公式
     const { content: processedContent, formulas } = preprocessLatex(markdown)
-    
-    // 2. 预处理不完整的 Markdown（流式时只做最基本的修复）
-    const preprocessed = preprocessIncompleteMarkdown(processedContent, streaming)
-    
-    // 3. 解析 Markdown
-    const html = marked.parse(preprocessed, {
-      async: false,
-      renderer: markdownRenderer
-    })
 
-    if (typeof html !== 'string') {
-      return String(html)
+    let finalHtml
+
+    if (streaming) {
+      // ── 流式渲染：分离稳定行与不稳定行 ──
+      // 稳定行（已有完整换行结尾）→ 全量 markdown 解析
+      // 不稳定行（最后一行，可能不完整）→ 仅内联解析，避免产生块级结构
+      const lastNewlineIndex = processedContent.lastIndexOf('\n')
+      let stablePart = ''
+      let unstablePart = ''
+
+      if (lastNewlineIndex === -1) {
+        // 整段内容都在一行上，全部按内联处理
+        unstablePart = processedContent
+      } else {
+        stablePart = processedContent.substring(0, lastNewlineIndex + 1)
+        unstablePart = processedContent.substring(lastNewlineIndex + 1)
+      }
+
+      if (unstablePart && isCompleteBlockLine(unstablePart, stablePart)) {
+        stablePart += unstablePart + '\n'
+        unstablePart = ''
+      }
+
+      // 渲染稳定部分：修复块级结构后全量解析
+      let stableHtml = ''
+      if (stablePart && stablePart.trim()) {
+        const fixedStable = applyAllMarkdownFixes(stablePart)
+        try {
+          const parsed = marked.parse(fixedStable, { async: false, renderer: markdownRenderer })
+          stableHtml = typeof parsed === 'string' ? parsed : String(parsed)
+        } catch (e) {
+          stableHtml = escapeHtml(stablePart).replace(/\n/g, '<br>')
+        }
+      }
+
+      // 渲染不稳定部分：仅内联解析（marked.parseInline 不会产生块级元素）
+      let unstableHtml = ''
+      if (unstablePart && unstablePart.trim()) {
+        const inlineFixed = closeInlineFormatting(unstablePart)
+        try {
+          const parsed = marked.parseInline(inlineFixed, { async: false, renderer: markdownRenderer })
+          unstableHtml = typeof parsed === 'string' ? parsed : String(parsed)
+        } catch (e) {
+          unstableHtml = escapeHtml(unstablePart)
+        }
+      }
+
+      finalHtml = stableHtml + unstableHtml
+    } else {
+      // ── 非流式渲染：修复后全量解析 ──
+      const preprocessed = preprocessIncompleteMarkdown(processedContent, false)
+      const html = marked.parse(preprocessed, { async: false, renderer: markdownRenderer })
+      finalHtml = typeof html === 'string' ? html : String(html)
     }
 
     // 4. 后处理 LaTeX 公式
-    const finalHtml = postprocessLatex(html, formulas)
+    finalHtml = postprocessLatex(finalHtml, formulas)
 
     // 5. 清理 HTML
     return DOMPurify.sanitize(finalHtml, {
@@ -455,10 +709,10 @@ function renderMarkdown(markdown, streaming = false) {
   } catch (error) {
     console.warn('[MarkdownRenderer] parse error:', error)
     return markdown
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\n/g, '<br>')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>')
   }
 }
 
@@ -485,13 +739,13 @@ watch(() => props.markdown, () => {
   .katex {
     font-size: 1.1em;
   }
-  
+
   .katex-display {
     margin: 16px 0;
     overflow-x: auto;
     overflow-y: hidden;
   }
-  
+
   .latex-error {
     color: #d73a49;
     background-color: #ffe6e6;

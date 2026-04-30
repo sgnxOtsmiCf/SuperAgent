@@ -11,7 +11,6 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -107,6 +106,7 @@ public class ToolCallAgent extends ReActAgent {
             // 使用流式调用
             Flux<ChatResponse> streamResponse = context.getChatClient().prompt(prompt)
                     .system(getSystemPrompt())
+                    .options(chatOptions)
                     .toolCallbacks(availableTools)
                     .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, context.getSessionId())
                             .param("retrieveSize", 10)

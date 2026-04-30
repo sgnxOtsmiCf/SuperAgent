@@ -11,6 +11,7 @@ import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.deepseek.DeepSeekAssistantMessage;
 import org.springframework.ai.zhipuai.ZhiPuAiAssistantMessage;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
@@ -37,9 +38,11 @@ public class StreamingHandler {
                     if (isConnectionResetError(error)) {
                         log.error("检测到连接重置异常，可能是网络波动: {}", error.getMessage());
                         sendError(emitter, JsonUtils.toJson(Result.build(ResultCodeEnum.MODEL_FAIL)));
-                    } else {
-                        error.printStackTrace();
-                        log.error("流式调用异常:{}", error.getMessage());
+                    } else if (error instanceof WebClientResponseException webClientResponseException) {
+                        log.error("流式错误...............");
+                        log.error("错误码:{}", webClientResponseException.getStatusCode());
+                        log.error("错误信息:{}",webClientResponseException.getMessage());
+                        log.error("错误体:{}", webClientResponseException.getResponseBodyAsString());
                         sendError(emitter, JsonUtils.toJson(Result.build(ResultCodeEnum.AGENT_FAIL)));
                     }
                 },
@@ -93,6 +96,18 @@ public class StreamingHandler {
         switch (output.getOutputType()) {
             case AGENT_MODEL_STREAMING -> {
                 if (output.message() instanceof AssistantMessage assistantMessage) {
+                    // 先检查普通文本内容（优先于推理内容）
+                    // ReasoningContentChatModelWrapper 会在 text-only chunk 的 metadata
+                    // 中注入 accumulatedReasoningContent，若先判断 reasoningContent
+                    // 则 text chunk 会被误判为 thinking 事件，导致前端无法看到正常文本。
+                    String text = assistantMessage.getText();
+                    if (text != null && !text.isEmpty()) {
+                        emitter.send(SseEmitter.event()
+                                .name("message")
+                                .data(text));
+                    }
+
+                    // 再检查推理内容（仅当 reasoningContent 不为空时发送）
                     String reasoningContent = "";
                     if (output.message() instanceof DeepSeekAssistantMessage deepSeekAssistMessage) {
                         reasoningContent = deepSeekAssistMessage.getReasoningContent();
@@ -106,21 +121,11 @@ public class StreamingHandler {
                         }
                     }
                     if (reasoningContent != null && !reasoningContent.isEmpty()) {
-                        //思考过程
                         log.info("reasoningContent:{}", reasoningContent);
                         emitter.send(SseEmitter.event()
                                 .name("thinking")
                                 .data(reasoningContent));
-                    } else {
-                        //普通响应
-                        String text = output.message().getText();
-                        if (text != null && !text.isEmpty()) {
-                            emitter.send(SseEmitter.event()
-                                    .name("message")
-                                    .data(text));
-                        }
                     }
-
                 }
             }
             case AGENT_MODEL_FINISHED -> {

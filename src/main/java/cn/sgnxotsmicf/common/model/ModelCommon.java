@@ -17,6 +17,9 @@ public interface ModelCommon {
     String MODEL_QWEN_PLUS = "qwen-plus";
     String MODEL_QWEN_MAX = "qwen-max";
     String MODEL_QWEN_TURBO = "qwen-turbo";
+    String MODEL_QWEN3_235B = "qwen3-235b-a22b";
+    String MODEL_QWEN3_30B = "qwen3-30b-a3b";
+    String MODEL_QWQ_PLUS = "qwq-plus";
     String MODEL_DEEPSEEK_CHAT = "deepseek-chat";
     String MODEL_DEEPSEEK_REASONER = "deepseek-reasoner";
     String MODEL_DEEPSEEK_V4_FLASH = "deepseek-v4-flash";

@@ -6,6 +6,8 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import org.springaicommunity.mcp.annotation.McpTool;
 import org.springaicommunity.mcp.annotation.McpToolParam;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -24,8 +26,8 @@ public class ImageSearchTool {
     // Pexels 常规搜索接口（请以文档为准）
     private static final String API_URL = "https://api.pexels.com/v1/search";
 
-    @McpTool(description = "search image from web")
-    public String searchImage(@McpToolParam(description = "Search query keyword") String query) {
+    @Tool(description = "search image from web")
+    public String searchImage(@ToolParam(description = "Search query keyword") String query) {
         try {
             return String.join(",", searchMediumImages(query));
         } catch (Exception e) {

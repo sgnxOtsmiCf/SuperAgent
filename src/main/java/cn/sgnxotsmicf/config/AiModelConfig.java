@@ -39,6 +39,7 @@ public class AiModelConfig {
                 .enableThinking(true)
                 .thinkingBudget(500)
                 .enableSearch(true)
+                .parallelToolCalls(false)  //针对dashscope优化
                 .build();
     }
 }

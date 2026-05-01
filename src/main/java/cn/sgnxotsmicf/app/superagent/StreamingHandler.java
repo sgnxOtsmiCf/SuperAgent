@@ -96,18 +96,12 @@ public class StreamingHandler {
         switch (output.getOutputType()) {
             case AGENT_MODEL_STREAMING -> {
                 if (output.message() instanceof AssistantMessage assistantMessage) {
-                    // 先检查普通文本内容（优先于推理内容）
-                    // ReasoningContentChatModelWrapper 会在 text-only chunk 的 metadata
-                    // 中注入 accumulatedReasoningContent，若先判断 reasoningContent
-                    // 则 text chunk 会被误判为 thinking 事件，导致前端无法看到正常文本。
                     String text = assistantMessage.getText();
                     if (text != null && !text.isEmpty()) {
                         emitter.send(SseEmitter.event()
                                 .name("message")
                                 .data(text));
                     }
-
-                    // 再检查推理内容（仅当 reasoningContent 不为空时发送）
                     String reasoningContent = "";
                     if (output.message() instanceof DeepSeekAssistantMessage deepSeekAssistMessage) {
                         reasoningContent = deepSeekAssistMessage.getReasoningContent();

@@ -51,6 +51,7 @@ public class QwenAgentCreator extends AbstractReactAgentCreator{
                 .temperature(request.getTemperature())
                 .topP(request.getTopP())
                 .topK(request.getTopK().intValue())
+                //.parallelToolCalls(false)  //针对dashscope优化
                 .build();
     }
 

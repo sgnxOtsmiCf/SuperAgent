@@ -454,14 +454,32 @@ public class ServiceUtil {
      * @param assistantMessage AssistantMessage对象
      */
     private void enrichAssistantMetadata(Map<String, Object> metadata, AssistantMessage assistantMessage) {
-        if (assistantMessage instanceof ZhiPuAiAssistantMessage zhiPuAiAssistantMessage) {
-            // TODO: 智谱AI特有字段处理
-            // metadata.put("zhiPuSpecificField", zhiPuAiAssistantMessage.getXXX());
-        } else if (assistantMessage instanceof DeepSeekAssistantMessage deepSeekAssistantMessage) {
-            // TODO: DeepSeek特有字段处理
-            // metadata.put("deepSeekSpecificField", deepSeekAssistantMessage.getXXX());
+        Object existingReasoning = metadata.get("reasoningContent");
+        if (existingReasoning != null && !existingReasoning.toString().isEmpty()) {
+            return;
         }
-        // 其他厂商扩展点...
+        if (assistantMessage instanceof ZhiPuAiAssistantMessage zhiPuAiAssistantMessage) {
+            String reasoningContent = zhiPuAiAssistantMessage.getReasoningContent();
+            if (reasoningContent != null && !reasoningContent.isEmpty()) {
+                metadata.put("reasoningContent", reasoningContent);
+            }
+        } else if (assistantMessage instanceof DeepSeekAssistantMessage deepSeekAssistantMessage) {
+            String reasoningContent = deepSeekAssistantMessage.getReasoningContent();
+            if (reasoningContent != null && !reasoningContent.isEmpty()) {
+                metadata.put("reasoningContent", reasoningContent);
+            }
+        } else {
+            try {
+                java.lang.reflect.Method method = assistantMessage.getClass().getMethod("getReasoningContent");
+                Object reasoningContent = method.invoke(assistantMessage);
+                if (reasoningContent != null && !reasoningContent.toString().isEmpty()) {
+                    metadata.put("reasoningContent", reasoningContent.toString());
+                }
+            } catch (NoSuchMethodException ignored) {
+            } catch (Exception e) {
+                log.warn("反射提取reasoningContent失败: {}", e.getMessage());
+            }
+        }
     }
 
 

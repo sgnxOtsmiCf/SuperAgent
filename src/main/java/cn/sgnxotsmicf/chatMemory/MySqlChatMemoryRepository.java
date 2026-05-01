@@ -142,8 +142,17 @@ public class MySqlChatMemoryRepository implements ChatMemoryRepository {
         return switch (type) {
             case USER -> UserMessage.builder().text(po.getContent()).metadata(po.getMetadata()).build();
             case ASSISTANT -> {
-                String toolCalls = (String) po.getMetadata().get("toolCalls");
-                List<AssistantMessage.ToolCall> toolCallList = JSONUtil.toList(toolCalls, AssistantMessage.ToolCall.class);
+                Object toolCallsObj = po.getMetadata().get("toolCalls");
+                List<AssistantMessage.ToolCall> toolCallList;
+                if (toolCallsObj instanceof String toolCallsStr) {
+                    toolCallList = JSONUtil.toList(toolCallsStr, AssistantMessage.ToolCall.class);
+                } else if (toolCallsObj instanceof List<?> list) {
+                    toolCallList = list.stream()
+                            .map(item -> JSONUtil.toBean(JSONUtil.toJsonStr(item), AssistantMessage.ToolCall.class))
+                            .collect(Collectors.toList());
+                } else {
+                    toolCallList = List.of();
+                }
                 yield AssistantMessage.builder().toolCalls(toolCallList).content(po.getContent()).properties(po.getMetadata()).build();
             }
             case SYSTEM -> SystemMessage.builder().text(po.getContent()).metadata(po.getMetadata()).build();

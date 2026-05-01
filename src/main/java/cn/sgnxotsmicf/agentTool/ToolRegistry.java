@@ -38,6 +38,7 @@ public class ToolRegistry {
     private final OnlineDocumentTool onlineDocumentTool;
     private final DateTimeTool dateTimeTool;
     private final MarkdownToPdfTool markdownToPdfTool;
+    private final ImageSearchTool imageSearchTool;
     // 本地工具
     private final BashTool bashTool;
     private final BrowserUseTool browserUseTool;
@@ -117,7 +118,8 @@ public class ToolRegistry {
                 smartWebFetchTool,
                 onlineDocumentTool,
                 dateTimeTool,
-                userInfoTool);
+                userInfoTool,
+                imageSearchTool);
                 //markdownToPdfTool);
     }
 

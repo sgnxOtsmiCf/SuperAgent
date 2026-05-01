@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -149,7 +150,7 @@ public class OpenManusChatSessionStrategy implements ChatSessionStrategy {
             log.error("未知错误");
         }
         if (messageList != null) {
-            List<ChatMessageVo> chatMessageVoList = messageList.stream().map(serviceUtil::getChatMessageVoByMessage).collect(Collectors.toList());
+            List<ChatMessageVo> chatMessageVoList = messageList.stream().map(serviceUtil::getChatMessageVoByMessage).filter(Objects::nonNull).collect(Collectors.toList());
             ChatSessionVo chatSessionVo = serviceUtil.getChatSessionVo(sessionId, chatMessageVoList, chatSessionService);
             if (chatSessionVo != null) {
                 return chatSessionVo;

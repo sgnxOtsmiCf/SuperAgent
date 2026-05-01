@@ -201,7 +201,7 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
         return sessionIdMessageListMap.entrySet().stream().filter(entry -> !filterSessionIdList.contains(entry.getKey())).map(entry -> {
                     String sessionId = entry.getKey();
                     List<Message> messageList = entry.getValue();
-                    List<ChatMessageVo> chatMessageVoList = messageList.stream().map(message -> serviceUtil.getChatMessageVoByMessage(message)).collect(Collectors.toList());
+                    List<ChatMessageVo> chatMessageVoList = messageList.stream().map(message -> serviceUtil.getChatMessageVoByMessage(message)).filter(Objects::nonNull).collect(Collectors.toList());
                     return serviceUtil.getChatSessionVo(sessionId, chatMessageVoList, this);
                 }).filter(Objects::nonNull)
                 .sorted((vo1, vo2) -> vo2.getLastActive().compareTo(vo1.getLastActive()))
@@ -213,7 +213,7 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
         return sessionIdMessageListMap.entrySet().stream().map(entry -> {
                     String sessionId = entry.getKey();
                     List<Message> messageList = entry.getValue();
-                    List<ChatMessageVo> chatMessageVoList = messageList.stream().map(message -> serviceUtil.getChatMessageVoByMessage(message)).collect(Collectors.toList());
+                    List<ChatMessageVo> chatMessageVoList = messageList.stream().map(message -> serviceUtil.getChatMessageVoByMessage(message)).filter(Objects::nonNull).collect(Collectors.toList());
                     return serviceUtil.getChatSessionVo(sessionId, chatMessageVoList, this);
                 }).filter(Objects::nonNull)
                 .sorted((vo1, vo2) -> vo2.getLastActive().compareTo(vo1.getLastActive()))

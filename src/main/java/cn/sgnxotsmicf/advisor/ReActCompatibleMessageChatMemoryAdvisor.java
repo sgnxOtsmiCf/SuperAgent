@@ -1,5 +1,6 @@
 package cn.sgnxotsmicf.advisor;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.ai.chat.client.ChatClientMessageAggregator;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -18,29 +19,22 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
-/**
- * 兼容 ReAct 模式的 MessageChatMemoryAdvisor。
- *
- * 在 ReAct（think/act 循环）场景下，用户一次输入会触发多轮 LLM 调用，
- * 原版 MessageChatMemoryAdvisor 的 before() 每次都会将用户消息存入 memory，
- * 导致用户消息或工具消息被重复存储。
- *
- * 本类的改进：通过判断当前 prompt 的 instructions 中是否包含 AssistantMessage
- * 或 ToolResponseMessage 来识别是否处于 ReAct 循环中：
- * - 首次请求（instructions 中只有 UserMessage/SystemMessage）：正常保存用户消息
- * - ReAct 循环中的后续请求（instructions 中已有 AssistantMessage/ToolResponseMessage）：
- *   只加载历史到上下文，不重复保存用户消息
- */
 public final class ReActCompatibleMessageChatMemoryAdvisor implements BaseChatMemoryAdvisor {
 
     private final ChatMemory chatMemory;
     private final String defaultConversationId;
     private final int order;
     private final Scheduler scheduler;
+
+    private final ConcurrentHashMap<String, ConcurrentLinkedQueue<String>> reasoningContentAccumulators = new ConcurrentHashMap<>();
 
     private ReActCompatibleMessageChatMemoryAdvisor(ChatMemory chatMemory, String defaultConversationId, int order, Scheduler scheduler) {
         Assert.notNull(chatMemory, "chatMemory cannot be null");
@@ -61,11 +55,6 @@ public final class ReActCompatibleMessageChatMemoryAdvisor implements BaseChatMe
         return this.scheduler;
     }
 
-    /**
-     * 判断当前请求是否处于 ReAct 循环中。
-     * 如果 instructions 中包含 AssistantMessage 或 ToolResponseMessage
-     * 说明这是 ReAct 循环中的后续迭代，而非用户的首次请求。
-     */
     private boolean isReActIteration(List<Message> instructions) {
         for (Message message : instructions) {
             if (message instanceof AssistantMessage || message instanceof ToolResponseMessage) {
@@ -80,21 +69,15 @@ public final class ReActCompatibleMessageChatMemoryAdvisor implements BaseChatMe
         String conversationId = this.getConversationId(chatClientRequest.context(), this.defaultConversationId);
         List<Message> instructions = chatClientRequest.prompt().getInstructions();
 
-        // 合并历史消息和当前指令
         List<Message> processedMessages;
         if (isReActIteration(instructions)) {
-            // ReAct 循环中的后续请求：直接使用 instructions，不合并 memory 历史
-            // 因为 messageList 已经维护了完整的对话上下文
             processedMessages = new ArrayList<>(instructions);
-
-        }else {
-            // 首次请求：合并 memory 历史 + 当前 instructions
+        } else {
             List<Message> memoryMessages = this.chatMemory.get(conversationId);
             processedMessages = new ArrayList<>(memoryMessages);
             processedMessages.addAll(instructions);
         }
 
-        // 将 SystemMessage 移到最前面
         for (int i = 0; i < processedMessages.size(); ++i) {
             if (processedMessages.get(i) instanceof SystemMessage) {
                 Message systemMessage = processedMessages.remove(i);
@@ -107,7 +90,6 @@ public final class ReActCompatibleMessageChatMemoryAdvisor implements BaseChatMe
                 .prompt(chatClientRequest.prompt().mutate().messages(processedMessages).build())
                 .build();
 
-        // 核心：只在首次用户请求时保存用户消息，确保 ReAct 循环中不重复保存
         if (!isReActIteration(instructions) || processedMessages.getLast() instanceof ToolResponseMessage) {
             Message userMessage = processedChatClientRequest.prompt().getLastUserOrToolResponseMessage();
             this.chatMemory.add(conversationId, userMessage);
@@ -118,27 +100,101 @@ public final class ReActCompatibleMessageChatMemoryAdvisor implements BaseChatMe
 
     @Override
     public ChatClientResponse after(ChatClientResponse chatClientResponse, AdvisorChain advisorChain) {
+        return persistWithReasoningContent(chatClientResponse, null);
+    }
+
+    private ChatClientResponse persistWithReasoningContent(ChatClientResponse chatClientResponse, String streamConversationId) {
+        String conversationId = streamConversationId != null
+                ? streamConversationId
+                : this.getConversationId(chatClientResponse.context(), this.defaultConversationId);
+
         List<AssistantMessage> assistantMessages = new ArrayList<>();
         if (chatClientResponse.chatResponse() != null) {
             assistantMessages = chatClientResponse.chatResponse().getResults().stream()
                     .map(g -> g.getOutput())
                     .toList();
         }
+
+        ConcurrentLinkedQueue<String> accumulator = streamConversationId != null
+                ? reasoningContentAccumulators.remove(conversationId)
+                : null;
+        String accumulatedReasoning = (accumulator != null && !accumulator.isEmpty())
+                ? String.join("", accumulator)
+                : null;
+
         List<Message> messageList = assistantMessages.stream().map(assistantMessage -> {
-            Message message = assistantMessage;
-            return message;
+            if (accumulatedReasoning != null && !accumulatedReasoning.isEmpty()) {
+                Map<String, Object> newMetadata = new HashMap<>(assistantMessage.getMetadata());
+                newMetadata.put("reasoningContent", accumulatedReasoning);
+                return AssistantMessage.builder()
+                        .content(assistantMessage.getText())
+                        .toolCalls(assistantMessage.getToolCalls())
+                        .properties(newMetadata)
+                        .build();
+            }
+            Object existingReasoning = assistantMessage.getMetadata().get("reasoningContent");
+            if (existingReasoning == null || existingReasoning.toString().isEmpty()) {
+                Map<String, Object> newMetadata = new HashMap<>(assistantMessage.getMetadata());
+                enrichReasoningFromSubclass(newMetadata, assistantMessage);
+                if (newMetadata.containsKey("reasoningContent")) {
+                    return AssistantMessage.builder()
+                            .content(assistantMessage.getText())
+                            .toolCalls(assistantMessage.getToolCalls())
+                            .properties(newMetadata)
+                            .build();
+                }
+            }
+            return assistantMessage;
         }).collect(Collectors.toList());
-        this.chatMemory.add(this.getConversationId(chatClientResponse.context(), this.defaultConversationId), messageList);
+
+        this.chatMemory.add(conversationId, messageList);
         return chatClientResponse;
     }
 
+    private void enrichReasoningFromSubclass(Map<String, Object> metadata, AssistantMessage assistantMessage) {
+        try {
+            if (assistantMessage.getClass().getMethod("getReasoningContent") != null) {
+                Object reasoningContent = assistantMessage.getClass()
+                        .getMethod("getReasoningContent")
+                        .invoke(assistantMessage);
+                if (reasoningContent != null && !reasoningContent.toString().isEmpty()) {
+                    metadata.put("reasoningContent", reasoningContent.toString());
+                }
+            }
+        } catch (NoSuchMethodException ignored) {
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(getClass()).warn("提取reasoningContent失败: {}", e.getMessage());
+        }
+    }
+
+    @NotNull
     @Override
-    public Flux<ChatClientResponse> adviseStream(ChatClientRequest chatClientRequest, StreamAdvisorChain streamAdvisorChain) {
+    public Flux<ChatClientResponse> adviseStream(ChatClientRequest chatClientRequest, @NotNull StreamAdvisorChain streamAdvisorChain) {
         Scheduler scheduler = this.getScheduler();
+        String conversationId = this.getConversationId(chatClientRequest.context(), this.defaultConversationId);
+
+        reasoningContentAccumulators.put(conversationId, new ConcurrentLinkedQueue<>());
+
         Mono<ChatClientRequest> var10000 = Mono.just(chatClientRequest).publishOn(scheduler).map((request) -> this.before(request, streamAdvisorChain));
         Objects.requireNonNull(streamAdvisorChain);
         return var10000.flatMapMany(streamAdvisorChain::nextStream)
-                .transform((flux) -> (new ChatClientMessageAggregator()).aggregateChatClientResponse(flux, (response) -> this.after(response, streamAdvisorChain)));
+                .doOnNext(chatClientResponse -> {
+                    if (chatClientResponse.chatResponse() != null) {
+                        chatClientResponse.chatResponse().getResults().forEach(generation -> {
+                            AssistantMessage output = generation.getOutput();
+                            Object reasoningContent = output.getMetadata().get("reasoningContent");
+                            if (reasoningContent != null && !reasoningContent.toString().isEmpty()) {
+                                ConcurrentLinkedQueue<String> queue = reasoningContentAccumulators.get(conversationId);
+                                if (queue != null) {
+                                    queue.add(reasoningContent.toString());
+                                }
+                            }
+                        });
+                    }
+                })
+                .doOnError(error -> reasoningContentAccumulators.remove(conversationId))
+                .transform((flux) -> (new ChatClientMessageAggregator()).aggregateChatClientResponse(flux,
+                        (response) -> this.persistWithReasoningContent(response, conversationId)));
     }
 
     public static Builder builder(ChatMemory chatMemory) {

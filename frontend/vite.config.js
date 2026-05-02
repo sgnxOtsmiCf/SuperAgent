@@ -10,7 +10,7 @@ export default defineConfig({
     }
   },
   css: {
-    // 🔑 修复 Sass 弃用 API 警告：使用现代 API
+ // 修复 Sass 弃用 API 警告：使用现代 API
     preprocessorOptions: {
       scss: {
         api: 'modern-compiler'

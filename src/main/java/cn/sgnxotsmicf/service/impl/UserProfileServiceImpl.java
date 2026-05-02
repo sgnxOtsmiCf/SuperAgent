@@ -4,6 +4,7 @@ import cn.sgnxotsmicf.app.superagent.factory.SuperAgentFactory;
 import cn.sgnxotsmicf.app.superagent.hook.model.MemoryHook;
 import cn.sgnxotsmicf.common.result.Result;
 import cn.sgnxotsmicf.common.result.ResultCodeEnum;
+import cn.sgnxotsmicf.common.tools.ServiceUtil;
 import cn.sgnxotsmicf.common.vo.ProfileItemVo;
 import cn.sgnxotsmicf.common.vo.UserProfileVo;
 import cn.sgnxotsmicf.service.UserProfileService;
@@ -43,8 +44,11 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     private final SuperAgentFactory superAgentFactory;
 
+    private final ServiceUtil serviceUtil;
+
     @Override
-    public Result<UserProfileVo> getUserProfile(Long userId) {
+    public Result<UserProfileVo> getUserProfile() {
+        Long userId = serviceUtil.getUserId();
         UserProfileVo vo = new UserProfileVo();
         vo.setUserId(userId);
         vo.setProfiles(new ArrayList<>());
@@ -77,7 +81,8 @@ public class UserProfileServiceImpl implements UserProfileService {
     }
 
     @Override
-    public Result<UserProfileVo> updateUserProfile(Long userId, UserProfileServiceImpl.UpdateProfileRequest request) {
+    public Result<UserProfileVo> updateUserProfile(UserProfileServiceImpl.UpdateProfileRequest request) {
+        Long userId = serviceUtil.getUserId();
         if (request.getDimension() == null || request.getDimension().isBlank()) {
             return Result.build(null, ResultCodeEnum.FAIL.getCode(), "维度和值不能为空");
         }
@@ -127,7 +132,7 @@ public class UserProfileServiceImpl implements UserProfileService {
             store.putItem(item);
             log.info("手动更新用户画像成功, userId: {}, dimension: {}", userId, dimension);
 
-            return getUserProfile(userId);
+            return getUserProfile();
         } catch (Exception e) {
             log.error("更新用户画像失败, userId: {}", userId, e);
             return Result.build(null, ResultCodeEnum.FAIL.getCode(), "更新用户画像失败: " + e.getMessage());
@@ -135,7 +140,8 @@ public class UserProfileServiceImpl implements UserProfileService {
     }
 
     @Override
-    public Result<UserProfileVo> deleteUserProfile(Long userId, String dimension, String value) {
+    public Result<UserProfileVo> deleteUserProfile(String dimension, String value) {
+        Long userId = serviceUtil.getUserId();
         try {
             String userIdStr = userId.toString();
             Store store = superAgentFactory.buildRedisStore();
@@ -170,7 +176,7 @@ public class UserProfileServiceImpl implements UserProfileService {
             StoreItem item = StoreItem.of(List.of(USER_PROFILE_NAMESPACE), userIdStr, rawProfileToSave);
             store.putItem(item);
 
-            return getUserProfile(userId);
+            return getUserProfile();
         } catch (Exception e) {
             log.error("删除用户画像失败, userId: {}", userId, e);
             return Result.build(null, ResultCodeEnum.FAIL.getCode(), "删除用户画像失败: " + e.getMessage());

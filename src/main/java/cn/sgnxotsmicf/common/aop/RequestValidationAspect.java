@@ -31,7 +31,7 @@ public class RequestValidationAspect {
         Long agentId = chatRequest.getAgentId();
         String modelId = chatRequest.getModelId();
         if (type.equals("message")) {
-            if (StrUtil.isEmpty(message) || StrUtil.isEmpty(modelId) || agentId == 0L) {
+            if (StrUtil.isEmpty(message) || StrUtil.isEmpty(modelId) || agentId == null || agentId == 0L) {
                 throw new AgentException(ResultCodeEnum.PARAMETER_FAIL);
             }
         } else if (type.equals("full")) {
@@ -39,7 +39,16 @@ public class RequestValidationAspect {
             Double topP = chatRequest.getTopP();
             Double topK = chatRequest.getTopK();
             Long maxTokens = chatRequest.getMaxTokens();
-            if (temperature < 0 || topP <= 0 || topP > 1 || topK <= 0 || maxTokens <= 0) {
+            if (temperature != null && temperature < 0) {
+                throw new AgentException(ResultCodeEnum.PARAMETER_FAIL);
+            }
+            if (topP != null && (topP <= 0 || topP > 1)) {
+                throw new AgentException(ResultCodeEnum.PARAMETER_FAIL);
+            }
+            if (topK != null && topK <= 0) {
+                throw new AgentException(ResultCodeEnum.PARAMETER_FAIL);
+            }
+            if (maxTokens != null && maxTokens <= 0) {
                 throw new AgentException(ResultCodeEnum.PARAMETER_FAIL);
             }
         } else {

@@ -1,9 +1,10 @@
 import axios from 'axios'
+import { logger } from '@/utils/logger'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { isSystemError, isSessionError, isAuthError, getFriendlyErrorMessage } from './errorHandler'
 
-// 🔑 后端 ResultCodeEnum 错误码映射
+// 后端 ResultCodeEnum 错误码映射
 const ERROR_CODE_MAP = {
   200: { type: 'success', message: '成功' },
   201: { type: 'error', message: '操作失败' },
@@ -40,7 +41,7 @@ const ERROR_CODE_MAP = {
   1002: { type: 'error', message: '模型网络连接不稳定' }
 }
 
-// 🔑🔑🔑 新增：需要登出的错误码列表（sa-token 登录过期相关）
+// 新增：需要登出的错误码列表（sa-token 登录过期相关）
 const LOGOUT_ERROR_CODES = [208, 301, 219]
 
 const request = axios.create({
@@ -64,15 +65,15 @@ request.interceptors.request.use(
   }
 )
 
-// 🔑🔑🔑 新增：处理登录过期，自动登出
+// 新增：处理登录过期，自动登出
 function handleTokenExpired(message, code) {
   const userStore = useUserStore()
 
-  // 🔑🔑🔑 关键修复：无论是否已登录，都要显示提示
-  // 如果是208（未登录）且用户已登录，说明登录状态过期，执行登出
-  // 如果是208（未登录）且用户未登录，提示用户先登录
+ // 关键修复：无论是否已登录，都要显示提示
+ // 如果是208（未登录）且用户已登录，说明登录状态过期，执行登出
+ // 如果是208（未登录）且用户未登录，提示用户先登录
   if (code === 208 && !userStore.isLoggedIn) {
-    // 用户未登录，提示登录
+ // 用户未登录，提示登录
     ElMessageBox.alert(
       message || '请先登录',
       '未登录',
@@ -80,13 +81,13 @@ function handleTokenExpired(message, code) {
         confirmButtonText: '去登录',
         type: 'warning',
         callback: () => {
-          // 🔑 触发自定义事件打开登录对话框
+ // 触发自定义事件打开登录对话框
           window.dispatchEvent(new CustomEvent('show-login-dialog'))
         }
       }
     )
   } else {
-    // 用户已登录但token过期，执行登出
+ // 用户已登录但token过期，执行登出
     ElMessageBox.alert(
       message || '登录已过期，请重新登录',
       '登录过期',
@@ -94,9 +95,9 @@ function handleTokenExpired(message, code) {
         confirmButtonText: '确定',
         type: 'warning',
         callback: () => {
-          // 执行登出
+ // 执行登出
           userStore.logout()
-          // 刷新页面或跳转到登录页（根据你的路由配置）
+ // 刷新页面或跳转到登录页（根据你的路由配置）
           window.location.reload()
         }
       }
@@ -104,21 +105,21 @@ function handleTokenExpired(message, code) {
   }
 }
 
-// 🔑 核心升级：全局错误处理 - 全部使用顶部弹窗通知（ElMessage）
+// 核心升级：全局错误处理 - 全部使用顶部弹窗通知（ElMessage）
 request.interceptors.response.use(
   response => {
     const res = response.data
     const customHandleBusinessError = response.config?.customHandleBusinessError === true
 
-    // 🔑 关键：检查后端返回的业务状态码
+ // 关键：检查后端返回的业务状态码
     if (res.code !== undefined && res.code !== null) {
       if (res.code === 200) {
-        // 成功，直接返回数据
+ // 成功，直接返回数据
         return res
       } else if (customHandleBusinessError) {
         return res
       } else {
-        // 🔑🔑🔑 关键：检查是否需要自动登出（token过期）
+ // 关键：检查是否需要自动登出（token过期）
         if (LOGOUT_ERROR_CODES.includes(res.code)) {
           const errorConfig = ERROR_CODE_MAP[res.code] || { type: 'warning', message: '登录已过期' }
           handleTokenExpired(res.message || errorConfig.message, res.code)
@@ -130,17 +131,17 @@ request.interceptors.response.use(
           })
         }
 
-        // ❌ 业务错误：使用顶部弹窗通知（ElMessage）
+ // 业务错误：使用顶部弹窗通知（ElMessage）
         const errorConfig = ERROR_CODE_MAP[res.code] || { type: 'error', message: '未知错误' }
         let errorMessage = res.message || errorConfig.message
         
-        // 🔑 使用错误处理工具获取友好提示（系统错误和会话错误添加"稍后重试"）
+ // 使用错误处理工具获取友好提示（系统错误和会话错误添加"稍后重试"）
         errorMessage = getFriendlyErrorMessage(res.code, errorMessage)
 
-        console.error(`[API] 业务错误 [${res.code}]:`, errorMessage)
+        logger.error(`[API] 业务错误 [${res.code}]:`, errorMessage)
 
-        // 🔑🔑🔑 关键：使用 ElMessage 替代 ElMessageBox（自动消失，无需确认）
-        // 🔑 权限错误使用 warning，系统错误使用 error
+ // 关键：使用 ElMessage 替代 ElMessageBox（自动消失，无需确认）
+ // 权限错误使用 warning，系统错误使用 error
         if (isAuthError(res.code) || errorConfig.type === 'warning') {
           ElMessage.warning({
             message: errorMessage,
@@ -157,7 +158,7 @@ request.interceptors.response.use(
           })
         }
 
-        // 返回拒绝的Promise，让调用方可以catch处理
+ // 返回拒绝的Promise，让调用方可以catch处理
         return Promise.reject({
           code: res.code,
           message: errorMessage,
@@ -166,21 +167,21 @@ request.interceptors.response.use(
       }
     }
 
-    // 如果没有code字段，直接返回原始响应
+ // 如果没有code字段，直接返回原始响应
     return res
   },
   error => {
-    console.error('请求错误:', error)
+    logger.error('请求错误:', error)
 
     if (error.response) {
       const status = error.response.status
       const responseData = error.response.data
 
-      // 🔑 如果后端返回了带code的错误响应
+ // 如果后端返回了带code的错误响应
       if (responseData && responseData.code && responseData.code !== 200) {
         const errorMessage = responseData.message || `请求失败 (${status})`
 
-        // 🔑 使用顶部弹窗通知
+ // 使用顶部弹窗通知
         ElMessage.error({
           message: errorMessage,
           duration: 5000,
@@ -195,11 +196,11 @@ request.interceptors.response.use(
         })
       }
 
-      // HTTP状态码错误处理
+ // HTTP状态码错误处理
       let message = `请求失败 (${status})`
       if (status === 401) {
         message = '登录已过期，请重新登录'
-        // 🔑🔑🔑 关键：401 状态码也触发自动登出
+ // 关键：401 状态码也触发自动登出
         handleTokenExpired(message)
         return Promise.reject({
           code: status,
@@ -216,7 +217,7 @@ request.interceptors.response.use(
         message = '服务暂时不可用，请稍后重试'
       }
 
-      // 🔑 使用顶部弹窗通知（非确认对话框）
+ // 使用顶部弹窗通知（非确认对话框）
       ElMessage.error({
         message: message,
         duration: 5000,
@@ -230,7 +231,7 @@ request.interceptors.response.use(
         data: responseData
       })
     } else if (error.message.includes('timeout')) {
-      // 🔑 超时错误
+ // 超时错误
       ElMessage.warning({
         message: '请求超时，请稍后重试',
         duration: 4000,
@@ -240,10 +241,10 @@ request.interceptors.response.use(
 
       return Promise.reject({ code: -1, message: '请求超时' })
     } else if (error.message.includes('ERR_ABORTED') || error.name === 'AbortError') {
-      // 🔑 主动取消/中断（静默处理，不提示）
+ // 主动取消/中断（静默处理，不提示）
       return Promise.reject({ code: -3, message: '请求已中断' })
     } else {
-      // 🔑 其他网络错误
+ // 其他网络错误
       ElMessage.error({
         message: '网络连接失败，请检查后端服务是否启动',
         duration: 6000,  // 网络错误显示更久

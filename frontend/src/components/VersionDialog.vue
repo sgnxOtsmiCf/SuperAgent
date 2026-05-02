@@ -82,6 +82,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { versionApi } from '@/api/version'
 import { Close, StarFilled, WarningFilled, InfoFilled, Loading } from '@element-plus/icons-vue'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   versionInfo: {
@@ -119,8 +120,8 @@ async function loadVersionDetail() {
       }
     }
   } catch (error) {
-    console.error('[VersionDialog] 加载版本详情失败:', error)
-    // 使用传入的基本信息作为回退
+    logger.error('[VersionDialog] 加载版本详情失败:', error)
+ // 使用传入的基本信息作为回退
     detailInfo.value.version = props.versionInfo
   } finally {
     loading.value = false

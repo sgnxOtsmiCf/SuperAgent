@@ -2,13 +2,13 @@
   <div class="main-content">
     <div class="chat-header">
       <h2>{{ currentAppName }}</h2>
-      
+
       <!-- 模型选择下拉框（仅 superagent 显示） -->
-      <el-dropdown 
-        v-if="chatStore.appConfig[chatStore.currentApp]?.supportsModelSelection" 
-        trigger="click" 
-        class="model-selector"
-        popper-class="model-dropdown-popper"
+      <el-dropdown
+          v-if="chatStore.appConfig[chatStore.currentApp]?.supportsModelSelection"
+          trigger="click"
+          class="model-selector"
+          popper-class="model-dropdown-popper"
       >
         <span class="model-dropdown-trigger">
           <el-icon><Cpu /></el-icon>
@@ -23,23 +23,23 @@
                 {{ group.provider || '其他厂商' }}
               </el-dropdown-item>
               <el-dropdown-item
-                v-for="model in group.models"
-                :key="model.id"
-                :class="{ 'is-active': chatStore.currentModel === model.id }"
-                class="model-item-wrapper"
+                  v-for="model in group.models"
+                  :key="model.id"
+                  :class="{ 'is-active': chatStore.currentModel === model.id }"
+                  class="model-item-wrapper"
               >
                 <div class="model-item-row" @click.stop="handleModelChange(model.id)">
                   <span class="model-name">{{ model.name }}</span>
                   <el-tag v-for="tag in parseTags(model.tags)" :key="tag" size="small" type="warning" effect="plain" class="model-tag">{{ tag }}</el-tag>
                   <el-tag v-if="model.id === chatStore.currentModel" size="small" type="success" effect="plain" class="default-tag">当前</el-tag>
                 </div>
-                <el-button 
-                  text 
-                  circle 
-                  size="small"
-                  class="param-settings-btn"
-                  @click.stop="openParamSettings(model.id)"
-                  title="参数设置"
+                <el-button
+                    text
+                    circle
+                    size="small"
+                    class="param-settings-btn"
+                    @click.stop="openParamSettings(model.id)"
+                    title="参数设置"
                 >
                   <el-icon><Setting /></el-icon>
                 </el-button>
@@ -48,7 +48,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      
+
       <!-- 当前会话名下拉框 -->
       <el-dropdown v-if="currentSessionTitle" trigger="click" @command="handleSessionCommand">
         <span class="session-title-dropdown">
@@ -60,24 +60,24 @@
             <!-- 普通会话 -->
             <el-dropdown-item disabled class="dropdown-group-title">普通会话</el-dropdown-item>
             <el-dropdown-item
-              v-for="session in normalSessions"
-              :key="session.sessionId"
-              :command="{ type: 'switch', session }"
-              :class="{ 'is-active': session.sessionId === currentSessionIdValue }"
+                v-for="session in normalSessions"
+                :key="session.sessionId"
+                :command="{ type: 'switch', session }"
+                :class="{ 'is-active': session.sessionId === currentSessionIdValue }"
             >
               <el-icon><ChatDotRound /></el-icon>
               <span class="session-name">{{ session.title || session.sessionName || '新对话' }}</span>
             </el-dropdown-item>
-            
+
             <!-- 分隔线 -->
             <el-dropdown-item v-if="archivedSessions.length > 0" divided disabled class="dropdown-group-title">归档会话</el-dropdown-item>
-            
+
             <!-- 归档会话 -->
             <el-dropdown-item
-              v-for="session in archivedSessions"
-              :key="session.sessionId"
-              :command="{ type: 'switch', session }"
-              :class="{ 'is-active': session.sessionId === currentSessionIdValue }"
+                v-for="session in archivedSessions"
+                :key="session.sessionId"
+                :command="{ type: 'switch', session }"
+                :class="{ 'is-active': session.sessionId === currentSessionIdValue }"
             >
               <el-icon><Folder /></el-icon>
               <span class="session-name">{{ session.title || session.sessionName || '归档对话' }}</span>
@@ -97,27 +97,27 @@
       </div>
 
       <div
-        v-for="(message, index) in currentMessages"
-        :key="index"
-        class="message-wrapper"
-        :class="[message.role, { 'is-hovered': hoveredMessageIndex === index }]"
-        @mouseenter="hoveredMessageIndex = index"
-        @mouseleave="hoveredMessageIndex = null"
+          v-for="(message, index) in currentMessages"
+          :key="index"
+          class="message-wrapper"
+          :class="[message.role, { 'is-hovered': hoveredMessageIndex === index, 'no-animation': !shouldAnimateMessage(index) }]"
+          @mouseenter="hoveredMessageIndex = index"
+          @mouseleave="hoveredMessageIndex = null"
       >
         <!-- 🔑 用户消息：无头像，内容靠左 -->
         <div v-if="message.role === 'user'" class="user-message">
           <div class="text">{{ message.content }}</div>
           <!-- 用户消息操作按钮 -->
           <MessageActions
-            v-if="message.content"
-            :content="message.content"
-            :message-id="message.chatId"
-            :session-id="currentSessionIdValue"
-            :is-archived="isArchivedSession"
-            class="user-actions"
-            :class="{ visible: hoveredMessageIndex === index }"
-            @delete="handleDeleteMessage(index)"
-            @share="openShareDialog(index)"
+              v-if="message.content"
+              :content="message.content"
+              :message-id="message.chatId"
+              :session-id="currentSessionIdValue"
+              :is-archived="isArchivedSession"
+              class="user-actions"
+              :class="{ visible: hoveredMessageIndex === index }"
+              @delete="handleDeleteMessage(index)"
+              @share="openShareDialog(index)"
           />
         </div>
 
@@ -126,23 +126,23 @@
           <div class="message-content">
             <div class="markdown-wrapper">
               <AgentMessageRenderer
-                :content="message.content"
-                :metadata="message.metadata"
-                :is-streaming="chatStore.isStreamingResponse && index === currentMessages.length - 1 && message.role === 'assistant'"
+                  :content="message.content"
+                  :metadata="message.metadata"
+                  :is-streaming="chatStore.isStreamingResponse && index === currentMessages.length - 1 && message.role === 'assistant'"
               />
             </div>
           </div>
           <!-- AI消息操作按钮 - 只在非流式状态下显示（最后一条消息在流式时隐藏） -->
           <MessageActions
-            v-if="message.content && !(chatStore.isStreamingResponse && index === currentMessages.length - 1)"
-            :content="message.content"
-            :message-id="message.chatId"
-            :session-id="currentSessionIdValue"
-            :is-archived="isArchivedSession"
-            class="assistant-actions"
-            :class="{ visible: hoveredMessageIndex === index }"
-            @delete="handleDeleteMessage(index)"
-            @share="openShareDialog(index)"
+              v-if="message.content && !(chatStore.isStreamingResponse && index === currentMessages.length - 1)"
+              :content="message.content"
+              :message-id="message.chatId"
+              :session-id="currentSessionIdValue"
+              :is-archived="isArchivedSession"
+              class="assistant-actions"
+              :class="{ visible: hoveredMessageIndex === index }"
+              @delete="handleDeleteMessage(index)"
+              @share="openShareDialog(index)"
           />
         </div>
       </div>
@@ -163,18 +163,18 @@
 
     <!-- 🔑🔑🔑 分享对话框 -->
     <ShareDialog
-      v-if="showShareDialog"
-      :messages="currentMessages"
-      :initial-message-index="shareInitialIndex"
-      @close="closeShareDialog"
+        v-if="showShareDialog"
+        :messages="currentMessages"
+        :initial-message-index="shareInitialIndex"
+        @close="closeShareDialog"
     />
 
     <!-- 🔑 模型参数设置对话框 -->
     <ModelParamDialog
-      v-if="showParamDialog"
-      :model-id="paramDialogModelId"
-      :visible="showParamDialog"
-      @close="closeParamDialog"
+        v-if="showParamDialog"
+        :model-id="paramDialogModelId"
+        :visible="showParamDialog"
+        @close="closeParamDialog"
     />
 
     <div v-if="!isArchivedSession" class="chat-input-area">
@@ -182,33 +182,33 @@
       <div class="input-container-modern">
         <div class="input-wrapper">
           <el-input
-            v-model="inputMessage"
-            type="textarea"
-            :rows="1"
-            :autosize="{ minRows: 1, maxRows: 4 }"
-            placeholder="问点难的，让我多想一步"
-            @keydown.enter.exact="handleSend"
-            resize="none"
+              v-model="inputMessage"
+              type="textarea"
+              :rows="1"
+              :autosize="{ minRows: 1, maxRows: 4 }"
+              placeholder="问点难的，让我多想一步"
+              @keydown.enter.exact="handleSend"
+              resize="none"
           />
           <div class="input-actions">
             <!-- 🔑🔑🔑 新增：暂停/停止按钮（当加载中时显示） -->
             <el-button
-              v-if="isLoading"
-              type="danger"
-              circle
-              :icon="VideoPause"
-              @click="handleStop"
-              class="stop-btn"
-              title="停止接收"
+                v-if="isLoading"
+                type="danger"
+                circle
+                :icon="VideoPause"
+                @click="handleStop"
+                class="stop-btn"
+                title="停止接收"
             />
             <el-button
-              v-else
-              type="primary"
-              circle
-              :icon="Promotion"
-              @click="handleSend"
-              :disabled="!inputMessage.trim()"
-              class="send-btn"
+                v-else
+                type="primary"
+                circle
+                :icon="Promotion"
+                @click="handleSend"
+                :disabled="!inputMessage.trim()"
+                class="send-btn"
             />
           </div>
         </div>
@@ -236,12 +236,17 @@ const inputMessage = ref('')
 const isLoading = ref(false)
 const messagesContainer = ref(null)
 const hoveredMessageIndex = ref(null)
+let lastMessageCount = 0
 
-// 🔑🔑🔑 分享功能相关
+function shouldAnimateMessage(index) {
+  return index >= lastMessageCount - 1
+}
+
+// 分享功能相关
 const showShareDialog = ref(false)
 const shareInitialIndex = ref(-1)
 
-// 🔑 模型参数设置对话框
+// 模型参数设置对话框
 const showParamDialog = ref(false)
 const paramDialogModelId = ref('')
 
@@ -259,13 +264,13 @@ const abortController = ref(null)
 const currentAppName = computed(() => chatStore.appConfig[chatStore.currentApp]?.name || '智能助手')
 const currentAppIcon = computed(() => chatStore.appConfig[chatStore.currentApp]?.icon || 'MagicStick')
 
-// 🔑 当前模型名称
+// 当前模型名称
 const currentModelName = computed(() => {
   const model = chatStore.modelList.find(m => m.id === chatStore.currentModel)
   return model?.name || '通义千问 Plus'
 })
 
-// 🔑 按供应商分组的模型列表
+// 按供应商分组的模型列表
 const groupedModelList = computed(() => {
   const groups = {}
   chatStore.modelList.forEach(m => {
@@ -281,7 +286,7 @@ const groupedModelList = computed(() => {
   }))
 })
 
-// 🔑 解析tags字段（后端返回JSON数组字符串）
+// 解析tags字段（后端返回JSON数组字符串）
 function parseTags(tags) {
   if (!tags) return []
   if (Array.isArray(tags)) return tags
@@ -293,7 +298,7 @@ function parseTags(tags) {
   }
 }
 
-// 🔑 获取模型图标
+// 获取模型图标
 function getModelIcon(provider) {
   switch (provider) {
     case 'qwen': return 'MagicStick'
@@ -303,12 +308,12 @@ function getModelIcon(provider) {
   }
 }
 
-// 🔑 处理模型切换
+// 处理模型切换
 function handleModelChange(modelId) {
   chatStore.switchModel(modelId)
 }
 
-// 🔑 判断当前会话是否是归档会话
+// 判断当前会话是否是归档会话
 const isArchivedSession = computed(() => {
   const appKey = chatStore.currentApp
   const sessionId = chatStore.currentSessionId[appKey]
@@ -332,7 +337,7 @@ const currentSessionTitle = computed(() => {
   const sessionId = chatStore.currentSessionId[appKey]
   if (!sessionId) return ''
 
-  // 先从普通会话中查找
+ // 先从普通会话中查找
   const sessionList = chatStore.sessions[appKey]
   if (sessionList) {
     const session = sessionList.find(s => s.sessionId === sessionId)
@@ -341,7 +346,7 @@ const currentSessionTitle = computed(() => {
     }
   }
 
-  // 再从归档会话中查找
+ // 再从归档会话中查找
   const archivedList = chatStore.archivedSessions[appKey]
   if (archivedList) {
     const archivedSession = archivedList.find(s => s.sessionId === sessionId)
@@ -368,7 +373,7 @@ const archivedSessions = computed(() => {
 // 删除消息处理
 function handleDeleteMessage(index) {
   chatStore.currentMessages.splice(index, 1)
-  // 同步更新到会话存储
+ // 同步更新到会话存储
   const appKey = chatStore.currentApp
   const sessionId = chatStore.currentSessionId[appKey]
   if (sessionId) {
@@ -376,13 +381,13 @@ function handleDeleteMessage(index) {
   }
 }
 
-// 🔑🔑🔑 打开分享对话框
+// 打开分享对话框
 function openShareDialog(index) {
   shareInitialIndex.value = index
   showShareDialog.value = true
 }
 
-// 🔑🔑🔑 关闭分享对话框
+// 关闭分享对话框
 function closeShareDialog() {
   showShareDialog.value = false
   shareInitialIndex.value = -1
@@ -399,26 +404,32 @@ function handleSessionCommand(command) {
     const session = command.session
     const appKey = chatStore.currentApp
 
-    // 判断是否为归档会话
     const isArchived = session.isArchived === true
 
     if (isArchived) {
-      // 加载归档会话详情
-      chatStore.loadArchivedSession(session.sessionId, appKey)
+      const sessionList = chatStore.sessions[appKey]
+      if (sessionList) {
+        let existingIndex = sessionList.findIndex(s => s.sessionId === session.sessionId)
+        if (existingIndex !== -1) {
+          sessionList[existingIndex] = { ...sessionList[existingIndex], ...session, isArchived: true }
+        } else {
+          sessionList.unshift({ ...session, isArchived: true })
+        }
+      }
+      chatStore.loadSession(session.sessionId, appKey)
     } else {
-      // 加载普通会话
       chatStore.loadSession(session.sessionId, appKey)
     }
   }
 }
 
-watch(currentMessages, () => {
+watch(currentMessages, (newMessages) => {
+  lastMessageCount = newMessages.length
   scrollToBottom()
 }, { deep: true })
 
 onMounted(() => {
   isLoading.value = false
-  isStreaming = false
   chatStore.setStreamingResponse(false)
   if (abortController.value) {
     abortController.value.abort()
@@ -454,7 +465,6 @@ function ensureSessionReady() {
 }
 
 let accumulatedContent = ''
-let isStreaming = false
 let streamErrorMessage = ''
 
 const agentStreamState = ref({
@@ -465,7 +475,7 @@ const agentStreamState = ref({
   isUsingTools: false
 })
 
-// 🔑🔑🔑 新增：流式内容更新节流控制
+// 新增：流式内容更新节流控制
 let pendingContentUpdate = false
 let pendingMetadataUpdate = false
 let contentUpdateTimer = null
@@ -475,7 +485,6 @@ const METADATA_UPDATE_INTERVAL = 120  // 元数据更新间隔(ms)
 
 function resetStreamState() {
   accumulatedContent = ''
-  isStreaming = false
   streamErrorMessage = ''
   pendingContentUpdate = false
   pendingMetadataUpdate = false
@@ -523,8 +532,8 @@ function getAssistantContent(baseContent = '') {
   }
 
   return baseContent
-    ? `${baseContent}\n\n${errorSuffix}`
-    : streamErrorMessage
+      ? `${baseContent}\n\n${errorSuffix}`
+      : streamErrorMessage
 }
 
 function replaceAssistantMessage(messageIndex, { persist = false, forceIdle = false } = {}) {
@@ -574,7 +583,7 @@ async function handleSend() {
     timestamp: new Date().toISOString()
   })
 
-  // 🔑🔑🔑 新增：发送消息后提升会话排序（置顶到第一个）
+ // 新增：发送消息后提升会话排序（置顶到第一个）
   if (sessionId) {
     chatStore.promoteSessionAfterChat(sessionId, chatStore.currentApp)
   }
@@ -589,7 +598,7 @@ async function handleSend() {
   isLoading.value = true
   chatStore.setStreamingResponse(true)
 
-  // 🔑🔑🔑 新增：创建 AbortController 用于中断连接
+ // 新增：创建 AbortController 用于中断连接
   abortController.value = new AbortController()
 
   const appConfig = chatStore.appConfig[chatStore.currentApp]
@@ -614,34 +623,32 @@ async function handleSend() {
   }
 
   await fetchStream(
-    appConfig.apiPath,
-    appConfig.method,
-    params,
-    (data) => {
-      handleStreamData(data, assistantMessageIndex)
-    },
-    (error) => {
-      handleError(error)
-    },
-    () => {
-      finalizeAssistantMessage(assistantMessageIndex)
-      isLoading.value = false
-      isStreaming = false
-      abortController.value = null
-      chatStore.setStreamingResponse(false)
-    },
-    abortController.value
+      appConfig.apiPath,
+      appConfig.method,
+      params,
+      (data) => {
+        handleStreamData(data, assistantMessageIndex)
+      },
+      (error) => {
+        handleError(error)
+      },
+      () => {
+        finalizeAssistantMessage(assistantMessageIndex)
+        isLoading.value = false
+        abortController.value = null
+        chatStore.setStreamingResponse(false)
+      },
+      abortController.value
   )
 }
 
-// 🔑🔑🔑 新增：停止接收流式数据
+// 新增：停止接收流式数据
 function handleStop() {
   if (abortController.value) {
     abortController.value.abort()
     abortController.value = null
   }
   isLoading.value = false
-  isStreaming = false
   chatStore.setStreamingResponse(false)
   ElMessage.info('已停止接收')
 }
@@ -654,11 +661,10 @@ function handleStreamData(data, messageIndex) {
 
   if (data.isError || data.type === 'error') {
     isLoading.value = false
-    isStreaming = false
     abortController.value = null
     chatStore.setStreamingResponse(false)
 
-    // 🔑 清除所有待处理的更新
+ // 清除所有待处理的更新
     pendingContentUpdate = false
     pendingMetadataUpdate = false
     if (contentUpdateTimer) {
@@ -670,11 +676,11 @@ function handleStreamData(data, messageIndex) {
       metadataUpdateTimer = null
     }
 
-    // 🔑 使用错误处理工具获取友好提示
+ // 使用错误处理工具获取友好提示
     const errorContent = data.content || '服务异常'
     const errorCode = data.code
 
-    // 如果是系统错误或会话错误，添加"稍后重试"提示
+ // 如果是系统错误或会话错误，添加"稍后重试"提示
     if ((isSystemError(errorCode) || isSessionError(errorCode)) &&
         !errorContent.includes('稍后') && !errorContent.includes('重试')) {
       streamErrorMessage = `${errorContent}，请稍后重试`
@@ -692,7 +698,6 @@ function handleStreamData(data, messageIndex) {
   }
 
   if (data.type === 'thinking') {
-    isStreaming = true
     agentStreamState.value.isThinking = true
     agentStreamState.value.thinking += data.content
     scheduleMetadataUpdate(messageIndex)
@@ -700,7 +705,6 @@ function handleStreamData(data, messageIndex) {
   }
 
   if (data.type === 'toolUsage') {
-    isStreaming = true
     agentStreamState.value.isUsingTools = true
     data.tools.forEach(tool => {
       agentStreamState.value.toolUsages.push(tool)
@@ -710,7 +714,6 @@ function handleStreamData(data, messageIndex) {
   }
 
   if (data.type === 'toolResponse') {
-    isStreaming = true
     agentStreamState.value.isUsingTools = false
     data.responses.forEach(response => {
       agentStreamState.value.toolResponses.push(response)
@@ -720,8 +723,6 @@ function handleStreamData(data, messageIndex) {
   }
 
   if (data.content) {
-    isStreaming = true
-
     if (agentStreamState.value.isThinking) {
       agentStreamState.value.isThinking = false
     }
@@ -731,7 +732,7 @@ function handleStreamData(data, messageIndex) {
   }
 }
 
-// 🔑🔑🔑 新增：节流的内容更新
+// 新增：节流的内容更新
 function scheduleContentUpdate(messageIndex) {
   if (pendingContentUpdate) return
   pendingContentUpdate = true
@@ -747,7 +748,7 @@ function scheduleContentUpdate(messageIndex) {
   }, CONTENT_UPDATE_INTERVAL)
 }
 
-// 🔑🔑🔑 新增：节流的元数据更新
+// 新增：节流的元数据更新
 function scheduleMetadataUpdate(messageIndex) {
   if (pendingMetadataUpdate) return
   pendingMetadataUpdate = true
@@ -769,14 +770,13 @@ function handleError(error) {
   }
 
   isLoading.value = false
-  isStreaming = false
   chatStore.setStreamingResponse(false)
 
-  // 🔑 使用错误处理工具解析错误
+ // 使用错误处理工具解析错误
   const parsedError = parseError(error)
   let errorMessage = parsedError.message
 
-  // 如果没有解析到消息，使用默认消息
+ // 如果没有解析到消息，使用默认消息
   if (!errorMessage || errorMessage === 'undefined' || errorMessage === 'null') {
     if (error.isConnectionLost) {
       errorMessage = '连接已断开，请检查网络后重试'
@@ -787,8 +787,8 @@ function handleError(error) {
     }
   }
 
-  // 🔑 如果是系统错误或会话错误，确保添加"稍后重试"提示
-  if ((isSystemError(parsedError.code) || isSessionError(parsedError.code)) && 
+ // 如果是系统错误或会话错误，确保添加"稍后重试"提示
+  if ((isSystemError(parsedError.code) || isSessionError(parsedError.code)) &&
       !errorMessage.includes('稍后') && !errorMessage.includes('重试')) {
     errorMessage = `${errorMessage}，请稍后重试`
   }
@@ -831,10 +831,10 @@ function handleError(error) {
     margin: 0;
   }
 
-  // 🔑 模型选择器样式
+ // 模型选择器样式
   .model-selector {
     margin-left: auto;
-    
+
     .model-dropdown-trigger {
       display: flex;
       align-items: center;
@@ -989,17 +989,21 @@ function handleError(error) {
   margin-bottom: 20px;
   animation: fadeInUp 0.3s ease-out;
 
+  &.no-animation {
+    animation: none;
+  }
+
   &.user {
     display: flex;
     justify-content: flex-end;
     padding-right: 10%;
-    
+
     .user-message {
       max-width: 80%;
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      
+
       .text {
         padding: 10px 16px;
         background-color: #f7f8fa;
@@ -1014,7 +1018,7 @@ function handleError(error) {
       .user-actions {
         opacity: 0;
         transition: opacity 0.2s ease;
-        
+
         &.visible {
           opacity: 1;
         }
@@ -1024,7 +1028,7 @@ function handleError(error) {
 
   &.assistant {
     padding-left: 10%;
-    
+
     .assistant-message {
       display: flex;
       flex-direction: column;
@@ -1036,7 +1040,7 @@ function handleError(error) {
         flex-shrink: 0;
         cursor: pointer;
         margin-top: 16px;
-        
+
         &:hover {
           transform: scale(1.05);
           transition: transform 0.2s ease;
@@ -1053,55 +1057,49 @@ function handleError(error) {
 
         .markdown-wrapper {
           width: 100%;
-          
+
           :deep(.markdown-renderer) {
             font-size: 15px;
-            line-height: 2;
+            line-height: 1.9;
             color: #1f2937;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            
+
             h1 {
-              font-size: 2em;
-              line-height: 1.35;
+              font-size: 1.95em;
+              line-height: 1.3;
               margin-top: 1.6em;
               margin-bottom: 0.8em;
               font-weight: 700;
-              color: #111827;
-              letter-spacing: -0.02em;
+              letter-spacing: -0.025em;
             }
-            
+
             h2 {
-              font-size: 1.6em;
-              line-height: 1.4;
+              font-size: 1.55em;
+              line-height: 1.35;
               margin-top: 1.5em;
               margin-bottom: 0.75em;
               font-weight: 650;
-              color: #1f2937;
-              border-bottom: 1px solid #e5e7eb;
-              padding-bottom: 0.45em;
             }
-            
+
             h3 {
-              font-size: 1.35em;
-              line-height: 1.45;
+              font-size: 1.3em;
+              line-height: 1.4;
               margin-top: 1.35em;
               margin-bottom: 0.65em;
               font-weight: 600;
-              color: #374151;
             }
-            
+
             h4 {
               font-size: 1.15em;
-              line-height: 1.5;
+              line-height: 1.45;
               margin-top: 1.2em;
               margin-bottom: 0.6em;
               font-weight: 600;
-              color: #4b5563;
             }
-            
+
             h5, h6 {
               font-size: 1em;
-              line-height: 1.55;
+              line-height: 1.5;
               margin-top: 1.1em;
               margin-bottom: 0.55em;
               font-weight: 600;
@@ -1111,25 +1109,25 @@ function handleError(error) {
             p {
               margin-bottom: 1.4em;
               text-align: left;
-              
+
               &:last-child {
                 margin-bottom: 0;
               }
             }
-            
+
             ul, ol {
               margin-top: 0.8em;
               margin-bottom: 1.3em;
               padding-left: 1.75em;
-            
+
               li {
                 margin-bottom: 0.7em;
                 line-height: 1.85;
-                
+
                 ul, ol {
                   margin-top: 0.4em;
                   margin-bottom: 0.4em;
-                  
+
                   li {
                     margin-bottom: 0.35em;
                     font-size: 0.98em;
@@ -1138,19 +1136,19 @@ function handleError(error) {
                 }
               }
             }
-            
+
             ul {
               list-style-type: disc;
-              
+
               & > li::marker {
                 color: #60a5fa;
                 font-size: 0.85em;
               }
             }
-            
+
             ol {
               list-style-type: decimal;
-              
+
               & > li::marker {
                 color: #818cf8;
                 font-weight: 500;
@@ -1158,38 +1156,39 @@ function handleError(error) {
             }
 
             strong, b {
-              font-weight: 650;
+              font-weight: 700;
               color: #111827;
             }
-            
+
             em, i {
               font-style: italic;
               color: #374151;
             }
-            
+
             code:not(pre code) {
-              background-color: #f3f4f6;
+              background: linear-gradient(135deg, #fef2f2, #fff1f2);
               color: #dc2626;
-              padding: 0.15em 0.4em;
-              border-radius: 4px;
+              padding: 0.15em 0.45em;
+              border-radius: 6px;
               font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
-              font-size: 0.9em;
-              border: 1px solid #e5e7eb;
+              font-size: 0.88em;
+              border: 1px solid #fecaca;
+              font-weight: 500;
             }
 
             pre {
-              background-color: #1f2937;
-              color: #e5e7eb;
-              border-radius: 10px;
-              padding: 22px;
-              margin: 20px 0;
+              background: #f6f8fa;
+              color: #24292f;
+              border-radius: 14px;
+              padding: 22px 26px;
+              margin: 22px 0;
               overflow-x: auto;
               line-height: 1.7;
               font-size: 13.5px;
               font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
-              border: 1px solid #374151;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-              
+              border: 1px solid #e5e7eb;
+              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
               code {
                 background-color: transparent;
                 color: inherit;
@@ -1201,21 +1200,74 @@ function handleError(error) {
               }
             }
 
+            .code-block {
+              border-radius: 14px;
+              border: 1px solid #e5e7eb;
+              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+              &:hover {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+              }
+
+              .code-block-header {
+                background: linear-gradient(180deg, #ffffff, #f6f8fa);
+                border-bottom: 1px solid #e5e7eb;
+                padding: 10px 18px;
+              }
+
+              .code-block-language {
+                color: #0969da;
+                background: rgba(9, 105, 218, 0.08);
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-size: 12px;
+              }
+
+              .code-copy-button {
+                border: 1px solid #d0d7de;
+                background: rgba(255, 255, 255, 0.8);
+                color: #656d76;
+                border-radius: 8px;
+                padding: 5px 14px;
+
+                &:hover {
+                  border-color: #0969da;
+                  color: #0969da;
+                  background: rgba(9, 105, 218, 0.08);
+                }
+
+                &.is-copied {
+                  color: #1a7f37;
+                  border-color: #2da44e;
+                  background: rgba(31, 136, 61, 0.08);
+                }
+              }
+
+              pre {
+                margin: 0;
+                border: none;
+                border-radius: 0;
+                background-color: transparent;
+                box-shadow: none;
+                padding: 20px 24px;
+              }
+            }
+
             blockquote {
-              border-left: 4px solid #60a5fa;
-              background-color: #eff6ff;
-              padding: 18px 22px;
-              margin: 20px 0;
-              border-radius: 0 8px 8px 0;
-              color: #1e40af;
-              font-style: italic;
-              line-height: 1.8;
-              
+              border-left: 4px solid;
+              border-image: linear-gradient(to bottom, #3b82f6, #8b5cf6) 1;
+              background: linear-gradient(135deg, #eff6ff, #f5f3ff);
+              padding: 18px 24px;
+              margin: 22px 0;
+              border-radius: 0 12px 12px 0;
+              color: #1e3a5f;
+              line-height: 1.85;
+
               p {
                 margin-bottom: 0.6em;
                 color: inherit;
               }
-              
+
               p:last-child {
                 margin-bottom: 0;
               }
@@ -1223,47 +1275,54 @@ function handleError(error) {
 
             table {
               width: 100%;
-              border-collapse: collapse;
-              margin: 20px 0;
+              border-collapse: separate;
+              border-spacing: 0;
+              margin: 22px 0;
               font-size: 14px;
-              border-radius: 8px;
+              border-radius: 12px;
               overflow: hidden;
-              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-              
+              border: 1px solid #e5e7eb;
+              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+
               thead {
-                background-color: #f9fafb;
-                
                 th {
                   padding: 14px 16px;
                   text-align: left;
                   font-weight: 600;
-                  color: #111827;
-                  border-bottom: 2px solid #d1d5db;
+                  color: #1e293b;
+                  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+                  border-bottom: 2px solid #e2e8f0;
+                  white-space: nowrap;
                 }
               }
-              
+
               tbody {
                 tr {
                   transition: background-color 0.15s ease;
-                  
-                  &:hover {
+
+                  &:nth-child(even) {
                     background-color: #f9fafb;
                   }
-                  
-                  &:not(:last-child) td {
-                    border-bottom: 1px solid #e5e7eb;
+
+                  &:hover {
+                    background-color: #eff6ff;
                   }
-                  
+
+                  &:not(:last-child) td {
+                    border-bottom: 1px solid #f3f4f6;
+                  }
+
                   td {
                     padding: 13px 16px;
                     color: #374151;
                     line-height: 1.6;
-                    
+
                     code {
-                      background-color: #f3f4f6;
-                      padding: 0.15em 0.35em;
-                      border-radius: 3px;
+                      background: linear-gradient(135deg, #fef2f2, #fff1f2);
+                      padding: 0.15em 0.4em;
+                      border-radius: 5px;
                       font-size: 0.92em;
+                      border: 1px solid #fecaca;
                     }
                   }
                 }
@@ -1273,28 +1332,29 @@ function handleError(error) {
             hr {
               border: none;
               height: 2px;
-              background: linear-gradient(to right, transparent, #d1d5db, transparent);
-              margin: 28px 0;
+              background: linear-gradient(90deg, transparent, #cbd5e1, #a78bfa, #cbd5e1, transparent);
+              margin: 32px 0;
+              border-radius: 1px;
             }
 
             a {
               color: #2563eb;
               text-decoration: none;
-              border-bottom: 1px solid rgba(37, 99, 235, 0.3);
+              background: linear-gradient(transparent 70%, rgba(59, 130, 246, 0.15) 70%);
               transition: all 0.2s ease;
-              
+
               &:hover {
                 color: #1d4ed8;
-                border-bottom-color: #1d4ed8;
+                background: linear-gradient(transparent 60%, rgba(59, 130, 246, 0.25) 60%);
               }
             }
 
             img {
               max-width: 100%;
               height: auto;
-              border-radius: 8px;
+              border-radius: 12px;
               margin: 16px 0;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
             }
 
             input[type="checkbox"] {
@@ -1312,7 +1372,7 @@ function handleError(error) {
         opacity: 0;
         transition: opacity 0.2s ease;
         margin-top: 4px;
-        
+
         &.visible {
           opacity: 1;
         }
@@ -1406,7 +1466,7 @@ function handleError(error) {
         }
       }
 
-      // 🔑🔑🔑 新增：停止按钮样式
+ // 新增：停止按钮样式
       .stop-btn {
         width: 36px;
         height: 36px;

@@ -88,7 +88,7 @@ function blink() {
 
 // 点击处理：触发生气动画（由父组件控制）
 function handleClick() {
-  // 点击事件会冒泡到父组件，由父组件的handleAvatarClick处理
+ // 点击事件会冒泡到父组件，由父组件的handleAvatarClick处理
 }
 </script>
 

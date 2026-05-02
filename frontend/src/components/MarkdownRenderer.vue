@@ -8,11 +8,14 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import { marked, Renderer } from 'marked'
 import DOMPurify from 'dompurify'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.min.css'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   markdown: {
@@ -49,26 +52,26 @@ marked.setOptions({
 function preprocessLatex(content) {
   if (!content) return { content: '', formulas: [] }
 
-  // 保存公式的数组
+ // 保存公式的数组
   const formulas = []
 
-  // 处理块级公式 $$...$$
+ // 处理块级公式 $...$
   content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
     formulas.push({ type: 'block', formula: formula.trim() })
     return `__LATEX_BLOCK_${formulas.length - 1}__`
   })
 
-  // 处理行内公式 $...$（排除转义的 \$ 和表情符号如 ✅）
-  // 使用更严格的匹配：公式应该包含数学相关字符
+ // 处理行内公式 $...$（排除转义的 \$ 和表情符号如 ）
+ // 使用更严格的匹配：公式应该包含数学相关字符
   content = content.replace(/(?<!\\)\$([\s\S]*?)(?<!\\)\$/g, (match, formula) => {
     const trimmed = formula.trim()
-    // 如果内容看起来像数学公式（包含字母、数字、运算符等），则处理
-    // 排除纯表情符号或特殊字符
+ // 如果内容看起来像数学公式（包含字母、数字、运算符等），则处理
+ // 排除纯表情符号或特殊字符
     if (/[a-zA-Z0-9\\+\-\*\/\=\^_\{\}\(\)\[\]]/.test(trimmed) && trimmed.length > 0) {
       formulas.push({ type: 'inline', formula: trimmed })
       return `__LATEX_INLINE_${formulas.length - 1}__`
     }
-    // 否则保留原始内容
+ // 否则保留原始内容
     return match
   })
 
@@ -84,10 +87,10 @@ function renderLatex(formula, isBlock = false) {
       strict: false
     })
   } catch (error) {
-    console.warn('[MarkdownRenderer] LaTeX render error:', error)
+    logger.warn('[MarkdownRenderer] LaTeX render error:', error)
     return isBlock
-        ? `<div class="latex-error">$$${formula}$$</div>`
-        : `<span class="latex-error">$${formula}$</span>`
+        ? `<div class="latex-error">$${formula}$</div>`
+        : `<span class="latex-error">${formula}$</span>`
   }
 }
 
@@ -202,12 +205,12 @@ function detectBlockContext(content) {
       continue
     }
 
-    // 缩进内容（列表项延续），保持当前状态
+ // 缩进内容（列表项延续），保持当前状态
     if (/^\s{2,}\S/.test(line)) {
       continue
     }
 
-    // 非缩进非特殊行：重置引用；标题/分割线则同时重置列表
+ // 非缩进非特殊行：重置引用；标题/分割线则同时重置列表
     inBlockquote = false
     if (/^(#{1,6}\s|[-*_]{3,}\s*$)/.test(line)) {
       inList = false
@@ -226,12 +229,12 @@ function sanitizeUnstableLine(line, blockContext) {
 
   const trimmed = line.trim()
 
-  // 标题：流式过程中几乎总是不完整的，插入零宽空格阻止 marked 解析为标题
+ // 标题：流式过程中几乎总是不完整的，插入零宽空格阻止 marked 解析为标题
   if (/^#{1,6}\s/.test(line)) {
     return line.replace(/^(#{1,6})(\s)/, '$1​$2')
   }
 
-  // 无序列表标记：不在列表中时用反斜杠转义
+ // 无序列表标记：不在列表中时用反斜杠转义
   const ulMatch = line.match(/^(\s*)([-*+])(\s)/)
   if (ulMatch) {
     if (!ctx.inList) {
@@ -240,7 +243,7 @@ function sanitizeUnstableLine(line, blockContext) {
     return line
   }
 
-  // 有序列表标记：不在列表中时用反斜杠转义
+ // 有序列表标记：不在列表中时用反斜杠转义
   const olMatch = line.match(/^(\s*)(\d+[.)])(\s)/)
   if (olMatch) {
     if (!ctx.inList) {
@@ -249,22 +252,22 @@ function sanitizeUnstableLine(line, blockContext) {
     return line
   }
 
-  // 引用：不在引用块中时转义
+ // 引用：不在引用块中时转义
   if (/^(\s*)>\s/.test(line) && !ctx.inBlockquote) {
     return line.replace(/^(\s*)(>)(\s)/, '$1\\$2$3')
   }
 
-  // 代码围栏：不稳定行中出现几乎总是意外，转义
+ // 代码围栏：不稳定行中出现几乎总是意外，转义
   if (/^[ \t]*```/.test(line) || /^[ \t]*~~~/.test(line)) {
     return line.replace(/^([ \t]*)(```+|~~~+)/, '$1\\`\\`\\`')
   }
 
-  // 表格管道：转义
+ // 表格管道：转义
   if (/^(\s*)\|/.test(line)) {
     return line.replace(/^(\s*)(\|)/, '$1\\$2')
   }
 
-  // 水平分割线
+ // 水平分割线
   if (/^(-{3,}|_{3,}|\*{3,})\s*$/.test(trimmed)) {
     return line.replace(/^(\s*)([-_*]{3,})/, '$1\\$2')
   }
@@ -314,15 +317,15 @@ function preprocessIncompleteMarkdown(content, streaming = false) {
       unstablePart = processed.substring(lastNewlineIndex + 1)
     }
 
-    // 先修复稳定部分的块级结构（代码围栏闭合等）
+ // 先修复稳定部分的块级结构（代码围栏闭合等）
     if (stablePart) {
       stablePart = applyAllMarkdownFixes(stablePart)
     }
 
-    // 基于修复后的稳定部分检测块级上下文
+ // 基于修复后的稳定部分检测块级上下文
     const blockContext = stablePart ? detectBlockContext(stablePart) : null
 
-    // 不稳定部分：先转义块级语法冲突，再修复内联元素
+ // 不稳定部分：先转义块级语法冲突，再修复内联元素
     if (unstablePart) {
       unstablePart = applyInlineOnlyFixes(unstablePart, blockContext)
     }
@@ -334,17 +337,17 @@ function preprocessIncompleteMarkdown(content, streaming = false) {
 }
 
 function applyAllMarkdownFixes(processed) {
-  // 1. 修复不完整的代码块（保留缩进，避免破坏列表/引用嵌套）
+ // 1. 修复不完整的代码块（保留缩进，避免破坏列表/引用嵌套）
   processed = closeOpenCodeFence(processed)
 
-  // 2. 修复可能被截断的列表项（支持 - * + 和 1. 1) 样式）
+ // 2. 修复可能被截断的列表项（支持 - * + 和 1. 1) 样式）
   processed = processed.replace(/^(\s*[-*+]\s*)$/gm, '$1 ')
   processed = processed.replace(/^(\s*\d+[.)]\s*)$/gm, '$1 ')
 
-  // 3. 修复可能被截断的标题
+ // 3. 修复可能被截断的标题
   processed = processed.replace(/^(#{1,6})$/gm, '$1 ')
 
-  // 4. 修复不完整的粗体（双星号 **bold** 和双下划线 __bold__）
+ // 4. 修复不完整的粗体（双星号 **bold** 和双下划线 __bold__）
   const boldCount = (processed.match(/\*\*/g) || []).length
   if (boldCount % 2 !== 0) {
     processed += '**'
@@ -354,30 +357,30 @@ function applyAllMarkdownFixes(processed) {
     processed += '__'
   }
 
-  // 5. 修复不完整的斜体（单星号 *italic*，排除列表标记符号）
+ // 5. 修复不完整的斜体（单星号 *italic*，排除列表标记符号）
   const singleAsteriskCount = countNonListAsterisks(processed)
   if (singleAsteriskCount % 2 !== 0) {
     processed += '*'
   }
 
-  // 6. 修复不完整的斜体（单下划线 _italic_，仅匹配单词边界的下划线）
+ // 6. 修复不完整的斜体（单下划线 _italic_，仅匹配单词边界的下划线）
   const singleUnderscoreCount = countNonWordUnderscores(processed)
   if (singleUnderscoreCount % 2 !== 0) {
     processed += '_'
   }
 
-  // 7. 修复不完整的行内代码
+ // 7. 修复不完整的行内代码
   const backtickCount = (processed.match(/`/g) || []).length
   if (backtickCount % 2 !== 0) {
     processed += '`'
   }
 
-  // 8. 修复不完整的链接 [text](url
+ // 8. 修复不完整的链接 [text](url
   if (/\[[^\]]+\]\([^)]*$/.test(processed)) {
     processed += ')'
   }
 
-  // 9. 修复不完整的表格行
+ // 9. 修复不完整的表格行
   if (hasTableStructure(processed)) {
     const lines = processed.split('\n')
     let lastLineIdx = lines.length - 1
@@ -396,45 +399,45 @@ function applyAllMarkdownFixes(processed) {
     }
   }
 
-  // 10. 修复不完整的引用块
+ // 10. 修复不完整的引用块
   processed = processed.replace(/^(\s*>\s*)$/gm, '$1 ')
 
-  // 11. 修复可能被截断的 HTML 标签（仅白名单标签，避免误匹配比较运算符）
+ // 11. 修复可能被截断的 HTML 标签（仅白名单标签，避免误匹配比较运算符）
   processed = closeOpenHtmlTag(processed)
 
   return processed
 }
 
 function applyInlineOnlyFixes(line, blockContext) {
-  // 对于正在输入的行(incomplete line)，先转义可能破坏块结构的语法
+ // 对于正在输入的行(incomplete line)，先转义可能破坏块结构的语法
   let processed = sanitizeUnstableLine(line, blockContext)
 
-  // 1. 修复不完整的行内代码
+ // 1. 修复不完整的行内代码
   const backtickCount = (processed.match(/`/g) || []).length
   if (backtickCount % 2 !== 0) {
     processed += '`'
   }
 
-  // 2. 修复不完整的粗体（双星号）
+ // 2. 修复不完整的粗体（双星号）
   const boldCount = (processed.match(/\*\*/g) || []).length
   if (boldCount % 2 !== 0) {
     processed += '**'
   }
 
-  // 3. 修复不完整的斜体（单星号，排除以"* "开头的情况因为那可能是新列表项的开头）
+ // 3. 修复不完整的斜体（单星号，排除以"* "开头的情况因为那可能是新列表项的开头）
   const nonListAsterisk = processed.replace(/^\s*\*\s/, '')
   const singleAsteriskMatches = nonListAsterisk.match(/(?<!\*)\*(?!\*)/g) || []
   if (singleAsteriskMatches.length % 2 !== 0) {
     processed += '*'
   }
 
-  // 4. 修复不完整的粗体/斜体（下划线样式）
+ // 4. 修复不完整的粗体/斜体（下划线样式）
   const underlineBoldCount = (processed.match(/__/g) || []).length
   if (underlineBoldCount % 2 !== 0) {
     processed += '__'
   }
 
-  // 5. 修复不完整的斜体（单下划线）
+ // 5. 修复不完整的斜体（单下划线）
   let singleUnderscoreCount = 0
   let inCode = false
   for (let i = 0; i < processed.length; i++) {
@@ -455,7 +458,7 @@ function applyInlineOnlyFixes(line, blockContext) {
     processed += '_'
   }
 
-  // 6. 修复不完整的链接
+ // 6. 修复不完整的链接
   if (/\[[^\]]+\]\([^)]*$/.test(processed)) {
     processed += ')'
   }
@@ -472,23 +475,38 @@ function escapeHtml(value) {
       .replace(/'/g, '&#39;')
 }
 
+function highlightCode(code, language) {
+  if (language && hljs.getLanguage(language)) {
+    try {
+      return hljs.highlight(code, { language, ignoreIllegals: true }).value
+    } catch (_) { /* fallback */ }
+  }
+  try {
+    return hljs.highlightAuto(code).value
+  } catch (_) { /* fallback */ }
+  return escapeHtml(code)
+}
+
 function renderCodeBlock(code, infostring) {
   const language = (infostring || '').trim().split(/\s+/)[0]
   const languageLabel = language || 'text'
-  const escapedCode = escapeHtml(code)
-  const codeClassAttr = language ? ` class="language-${escapeHtml(language)}"` : ''
+  const highlightedCode = highlightCode(code, language)
+  const codeClassAttr = language ? ` class="hljs language-${escapeHtml(language)}"` : ' class="hljs"'
 
   if (!props.showCodeBlockHeader) {
-    return `<pre><code${codeClassAttr}>${escapedCode}</code></pre>`
+    return `<pre><code${codeClassAttr}>${highlightedCode}</code></pre>`
   }
 
   return `
     <div class="code-block">
       <div class="code-block-header">
         <span class="code-block-language">${escapeHtml(languageLabel)}</span>
-        <button type="button" class="code-copy-button" aria-label="复制代码">复制</button>
+        <button type="button" class="code-copy-button" aria-label="复制代码">
+          <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span class="copy-text">复制</span>
+        </button>
       </div>
-      <pre><code${codeClassAttr}>${escapedCode}</code></pre>
+      <pre><code${codeClassAttr}>${highlightedCode}</code></pre>
     </div>
   `
 }
@@ -523,7 +541,8 @@ async function copyText(text) {
 }
 
 function setCopyButtonState(button, text, copied = false) {
-  button.textContent = text
+  const textEl = button.querySelector('.copy-text')
+  if (textEl) textEl.textContent = text
   button.classList.toggle('is-copied', copied)
 
   const existingTimer = copyResetTimers.get(button)
@@ -533,7 +552,8 @@ function setCopyButtonState(button, text, copied = false) {
 
   const timer = setTimeout(() => {
     if (button.isConnected) {
-      button.textContent = '复制'
+      const el = button.querySelector('.copy-text')
+      if (el) el.textContent = '复制'
       button.classList.remove('is-copied')
     }
     copyResetTimers.delete(button)
@@ -559,7 +579,7 @@ async function handleRendererClick(event) {
     await copyText(codeText)
     setCopyButtonState(button, '已复制', true)
   } catch (error) {
-    console.error('[MarkdownRenderer] copy failed:', error)
+    logger.error('[MarkdownRenderer] copy failed:', error)
     setCopyButtonState(button, '复制失败')
   }
 }
@@ -570,27 +590,27 @@ function closeInlineFormatting(text) {
   if (!text) return text
   let result = text
 
-  // 1. 闭合粗体（**）
+ // 1. 闭合粗体（**）
   const doubleAsteriskCount = (result.match(/\*\*/g) || []).length
   if (doubleAsteriskCount % 2 !== 0) result += '**'
 
-  // 2. 闭合粗体（__）
+ // 2. 闭合粗体（__）
   const doubleUnderscoreCount = (result.match(/__/g) || []).length
   if (doubleUnderscoreCount % 2 !== 0) result += '__'
 
-  // 3. 闭合斜体（*），排除列表标记和已配对的情况
+ // 3. 闭合斜体（*），排除列表标记和已配对的情况
   const singleAsteriskCount = countNonListAsterisks(result)
   if (singleAsteriskCount % 2 !== 0) result += '*'
 
-  // 4. 闭合斜体（_），仅单词边界的下划线
+ // 4. 闭合斜体（_），仅单词边界的下划线
   const singleUnderscoreCount = countNonWordUnderscores(result)
   if (singleUnderscoreCount % 2 !== 0) result += '_'
 
-  // 5. 闭行内代码
+ // 5. 闭行内代码
   const backtickCount = (result.match(/`/g) || []).length
   if (backtickCount % 2 !== 0) result += '`'
 
-  // 6. 闭合未完成的链接/图片 [text](url 或 ![alt](url
+ // 6. 闭合未完成的链接/图片 [text](url 或 ![alt](url
   const lastParenOpen = result.lastIndexOf('](')
   if (lastParenOpen !== -1) {
     const rest = result.substring(lastParenOpen + 2)
@@ -640,21 +660,21 @@ function renderMarkdown(markdown, streaming = false) {
   }
 
   try {
-    // 1. 预处理 LaTeX 公式
+ // 1. 预处理 LaTeX 公式
     const { content: processedContent, formulas } = preprocessLatex(markdown)
 
     let finalHtml
 
     if (streaming) {
-      // ── 流式渲染：分离稳定行与不稳定行 ──
-      // 稳定行（已有完整换行结尾）→ 全量 markdown 解析
-      // 不稳定行（最后一行，可能不完整）→ 仅内联解析，避免产生块级结构
+ // ── 流式渲染：分离稳定行与不稳定行 ──
+ // 稳定行（已有完整换行结尾）→ 全量 markdown 解析
+ // 不稳定行（最后一行，可能不完整）→ 仅内联解析，避免产生块级结构
       const lastNewlineIndex = processedContent.lastIndexOf('\n')
       let stablePart = ''
       let unstablePart = ''
 
       if (lastNewlineIndex === -1) {
-        // 整段内容都在一行上，全部按内联处理
+ // 整段内容都在一行上，全部按内联处理
         unstablePart = processedContent
       } else {
         stablePart = processedContent.substring(0, lastNewlineIndex + 1)
@@ -666,7 +686,7 @@ function renderMarkdown(markdown, streaming = false) {
         unstablePart = ''
       }
 
-      // 渲染稳定部分：修复块级结构后全量解析
+ // 渲染稳定部分：修复块级结构后全量解析
       let stableHtml = ''
       if (stablePart && stablePart.trim()) {
         const fixedStable = applyAllMarkdownFixes(stablePart)
@@ -678,7 +698,7 @@ function renderMarkdown(markdown, streaming = false) {
         }
       }
 
-      // 渲染不稳定部分：仅内联解析（marked.parseInline 不会产生块级元素）
+ // 渲染不稳定部分：仅内联解析（marked.parseInline 不会产生块级元素）
       let unstableHtml = ''
       if (unstablePart && unstablePart.trim()) {
         const inlineFixed = closeInlineFormatting(unstablePart)
@@ -692,22 +712,22 @@ function renderMarkdown(markdown, streaming = false) {
 
       finalHtml = stableHtml + unstableHtml
     } else {
-      // ── 非流式渲染：修复后全量解析 ──
+ // ── 非流式渲染：修复后全量解析 ──
       const preprocessed = preprocessIncompleteMarkdown(processedContent, false)
       const html = marked.parse(preprocessed, { async: false, renderer: markdownRenderer })
       finalHtml = typeof html === 'string' ? html : String(html)
     }
 
-    // 4. 后处理 LaTeX 公式
+ // 4. 后处理 LaTeX 公式
     finalHtml = postprocessLatex(finalHtml, formulas)
 
-    // 5. 清理 HTML
+ // 5. 清理 HTML
     return DOMPurify.sanitize(finalHtml, {
       ADD_TAGS: ['pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'input', 'button', 'span', 'div', 'math', 'annotation'],
       ADD_ATTR: ['class', 'language', 'data-language', 'type', 'checked', 'disabled', 'aria-label', 'style', 'aria-hidden']
     })
   } catch (error) {
-    console.warn('[MarkdownRenderer] parse error:', error)
+    logger.warn('[MarkdownRenderer] parse error:', error)
     return markdown
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -717,14 +737,6 @@ function renderMarkdown(markdown, streaming = false) {
 }
 
 const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStreaming))
-
-// 监听 markdown 变化，在 DOM 更新后重新渲染 KaTeX
-watch(() => props.markdown, () => {
-  nextTick(() => {
-    // KaTeX 已经在 renderMarkdown 中渲染完成
-    // 这里可以添加额外的 DOM 操作如果需要
-  })
-}, { immediate: true })
 </script>
 
 <style lang="scss">
@@ -735,46 +747,90 @@ watch(() => props.markdown, () => {
   word-wrap: break-word;
   overflow-wrap: break-word;
 
-  // KaTeX 公式样式
+ // ── KaTeX 公式 ──
   .katex {
     font-size: 1.1em;
   }
 
   .katex-display {
-    margin: 16px 0;
+    margin: 20px 0;
     overflow-x: auto;
     overflow-y: hidden;
+    padding: 12px 0;
   }
 
   .latex-error {
-    color: #d73a49;
-    background-color: #ffe6e6;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-family: monospace;
+    color: #ef4444;
+    background-color: #fef2f2;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 13px;
+    border: 1px solid #fecaca;
   }
 
+ // ── 标题 ──
   h1, h2, h3, h4, h5, h6 {
-    margin-top: 24px;
+    margin-top: 28px;
     margin-bottom: 16px;
-    font-weight: 600;
-    line-height: 1.4;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #111827;
 
     &:first-child {
       margin-top: 0;
     }
   }
 
-  h1 { font-size: 28px; border-bottom: 2px solid #eaeaea; padding-bottom: 8px; }
-  h2 { font-size: 22px; border-bottom: 1px solid #eaeaea; padding-bottom: 6px; }
-  h3 { font-size: 18px; }
-  h4 { font-size: 16px; }
+  h1 {
+    font-size: 1.85em;
+    padding-bottom: 12px;
+    background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 
+  h2 {
+    font-size: 1.5em;
+    padding-bottom: 10px;
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+      border-radius: 2px;
+      opacity: 0.7;
+    }
+  }
+
+  h3 {
+    font-size: 1.3em;
+    color: #1e40af;
+  }
+
+  h4 {
+    font-size: 1.15em;
+    color: #374151;
+  }
+
+  h5, h6 {
+    font-size: 1em;
+    color: #6b7280;
+  }
+
+ // ── 段落 ──
   p {
     margin-top: 0;
     margin-bottom: 16px;
   }
 
+ // ── 列表 ──
   ul, ol {
     margin-top: 8px;
     margin-bottom: 16px;
@@ -782,8 +838,8 @@ watch(() => props.markdown, () => {
   }
 
   li {
-    margin-bottom: 6px;
-    line-height: 1.7;
+    margin-bottom: 8px;
+    line-height: 1.75;
 
     > p {
       margin-bottom: 6px;
@@ -817,88 +873,138 @@ watch(() => props.markdown, () => {
   input[type="checkbox"] {
     margin-right: 8px;
     vertical-align: middle;
+    accent-color: #3b82f6;
   }
 
+ // ── 链接 ──
   a {
-    color: #0969da;
+    color: #2563eb;
     text-decoration: none;
+    background: linear-gradient(transparent 70%, rgba(59, 130, 246, 0.15) 70%);
+    transition: all 0.2s ease;
 
     &:hover {
-      text-decoration: underline;
+      color: #1d4ed8;
+      background: linear-gradient(transparent 60%, rgba(59, 130, 246, 0.25) 60%);
     }
   }
 
+ // ── 图片 ──
   img {
     max-width: 100%;
     height: auto;
-    border-radius: 6px;
-    margin: 12px 0;
-  }
-
-  hr {
-    height: 2px;
-    background-color: #eaeaea;
-    border: none;
-    margin: 24px 0;
-  }
-
-  blockquote {
+    border-radius: 12px;
     margin: 16px 0;
-    padding: 12px 20px;
-    border-left: 4px solid #0969da;
-    background-color: #f6f8fa;
-    color: #57606a;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
 
-    p {
-      margin: 0;
+    &:hover {
+      transform: scale(1.01);
     }
   }
 
-  code:not(pre code) {
-    background-color: #f3f4f6;
-    color: #d73a49;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-    font-size: 13px;
-    border: 1px solid #e1e4e8;
+ // ── 水平分割线 ──
+  hr {
+    height: 2px;
+    border: none;
+    margin: 32px 0;
+    background: linear-gradient(90deg, transparent, #cbd5e1, #a78bfa, #cbd5e1, transparent);
+    border-radius: 1px;
   }
 
+ // ── 引用块 ──
+  blockquote {
+    margin: 20px 0;
+    padding: 16px 24px;
+    border-left: 4px solid;
+    border-image: linear-gradient(to bottom, #3b82f6, #8b5cf6) 1;
+    background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+    color: #1e3a5f;
+    border-radius: 0 12px 12px 0;
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.04), rgba(139, 92, 246, 0.04));
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    p {
+      margin: 0;
+      position: relative;
+    }
+
+    p + p {
+      margin-top: 8px;
+    }
+  }
+
+ // ── 行内代码 ──
+  code:not(pre code) {
+    background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
+    color: #dc2626;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.88em;
+    border: 1px solid #fecaca;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+ // ── 代码块（无 header 的简单模式） ──
   pre {
-    margin: 16px 0;
-    padding: 16px;
-    background-color: #f6f8fa;
-    border: 1px solid #e1e4e8;
-    border-radius: 8px;
+    margin: 20px 0;
+    padding: 20px 24px;
+    background: #f6f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
     overflow-x: auto;
     position: relative;
+    line-height: 1.7;
+    font-size: 13.5px;
+    font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 
     code {
       background-color: transparent;
       padding: 0;
       border: none;
       border-radius: 0;
-      font-size: 14px;
-      line-height: 1.6;
-      color: #24292e;
+      font-size: inherit;
+      color: #24292f;
+      white-space: pre;
     }
   }
 
+ // ── 代码块（带 header） ──
   .code-block {
-    margin: 16px 0;
-    border: 1px solid #e1e4e8;
-    border-radius: 10px;
+    margin: 20px 0;
+    border-radius: 14px;
     overflow: hidden;
-    background-color: #f6f8fa;
+    background: #f6f8fa;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
 
     .code-block-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 10px 14px;
-      background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-      border-bottom: 1px solid #e1e4e8;
+      padding: 10px 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f6f8fa 100%);
+      border-bottom: 1px solid #e5e7eb;
     }
 
     .code-block-language {
@@ -906,31 +1012,44 @@ watch(() => props.markdown, () => {
       line-height: 1;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #64748b;
+      letter-spacing: 0.08em;
+      color: #0969da;
+      background: rgba(9, 105, 218, 0.08);
+      padding: 4px 10px;
+      border-radius: 6px;
     }
 
     .code-copy-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       appearance: none;
       border: 1px solid #d0d7de;
-      background: #ffffff;
-      color: #334155;
-      border-radius: 6px;
-      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.8);
+      color: #656d76;
+      border-radius: 8px;
+      padding: 5px 12px;
       font-size: 12px;
-      line-height: 1.2;
+      line-height: 1;
       cursor: pointer;
       transition: all 0.2s ease;
 
+      .copy-icon {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+
       &:hover {
-        border-color: #94a3b8;
-        background: #f8fafc;
+        border-color: #0969da;
+        color: #0969da;
+        background: rgba(9, 105, 218, 0.08);
       }
 
       &.is-copied {
-        color: #065f46;
-        border-color: #6ee7b7;
-        background: #ecfdf5;
+        color: #1a7f37;
+        border-color: #2da44e;
+        background: rgba(31, 136, 61, 0.08);
       }
     }
 
@@ -939,36 +1058,67 @@ watch(() => props.markdown, () => {
       border: none;
       border-radius: 0;
       background-color: transparent;
+      box-shadow: none;
+      padding: 20px 24px;
     }
   }
 
+ // ── 表格 ──
   table {
     width: 100%;
-    margin: 16px 0;
-    border-collapse: collapse;
+    margin: 20px 0;
+    border-collapse: separate;
     border-spacing: 0;
-    overflow: auto;
-    border: 1px solid #d0d7de;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    font-size: 14px;
 
     th, td {
-      padding: 10px 14px;
-      border: 1px solid #d0d7de;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f3f4f6;
+      border-right: 1px solid #f3f4f6;
       text-align: left;
+
+      &:last-child {
+        border-right: none;
+      }
     }
 
-    th {
-      font-weight: 600;
-      background-color: #f9fafb;
+    thead {
+      th {
+        background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+        font-weight: 600;
+        color: #1e293b;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
+      }
     }
 
-    tr:nth-child(even) {
-      background-color: #f6f8fa;
+    tbody {
+      tr {
+        transition: background-color 0.15s ease;
+
+        &:nth-child(even) {
+          background-color: #f9fafb;
+        }
+
+        &:hover {
+          background-color: #eff6ff;
+        }
+
+        &:last-child td {
+          border-bottom: none;
+        }
+      }
     }
   }
 
+ // ── 文本格式 ──
   strong {
-    font-weight: 600;
-    color: #1a1a1a;
+    font-weight: 700;
+    color: #111827;
   }
 
   em {
@@ -977,7 +1127,7 @@ watch(() => props.markdown, () => {
 
   del {
     text-decoration: line-through;
-    color: #6a737d;
+    color: #9ca3af;
   }
 
   sup, sub {
@@ -1002,10 +1152,11 @@ watch(() => props.markdown, () => {
     font-family: monospace;
     font-size: 13px;
     line-height: 1.6;
-    color: #333;
-    background-color: #f9f9f9;
-    padding: 12px;
-    border-radius: 6px;
+    color: #374151;
+    background-color: #f9fafb;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
   }
 }
 </style>

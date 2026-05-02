@@ -17,7 +17,7 @@ provide('toggleLogin', () => {
   showLogin.value = !showLogin.value
 })
 
-// 🔑 监听全局登录事件
+// 监听全局登录事件
 function handleShowLoginEvent() {
   showLogin.value = true
 }

@@ -13,15 +13,19 @@
         </button>
       </el-tooltip>
 
-      <!-- 朗读 -->
-      <el-tooltip content="朗读" placement="top" :show-after="300">
-        <button class="action-btn" @click="handleSpeak">
-          <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+      <!-- 朗读/停止朗读 -->
+      <el-tooltip :content="isSpeaking ? '停止朗读' : '朗读'" placement="top" :show-after="300">
+        <button class="action-btn" :class="{ active: isSpeaking }" @click="handleSpeak">
+          <svg v-if="!isSpeaking" class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
             <line x1="12" y1="19" x2="12" y2="23"></line>
             <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+          <svg v-else class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
           </svg>
         </button>
       </el-tooltip>
@@ -89,6 +93,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { messageApi } from '@/api/message'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   content: {
@@ -115,6 +120,7 @@ const isHovered = ref(false)
 const isVisible = ref(false)
 const isLiked = ref(false)
 const isDisliked = ref(false)
+const isSpeaking = ref(false)
 
 const canDelete = computed(() => {
   return props.isArchived && props.messageId && props.messageId !== -1
@@ -145,9 +151,19 @@ async function handleCopy() {
   }
 }
 
+let currentUtterance = null
+
 function handleSpeak() {
   if (!props.content) {
     ElMessage.warning('没有可朗读的内容')
+    return
+  }
+
+  if (isSpeaking.value) {
+    window.speechSynthesis.cancel()
+    isSpeaking.value = false
+    currentUtterance = null
+    ElMessage.info('已停止朗读')
     return
   }
 
@@ -158,7 +174,19 @@ function handleSpeak() {
   utterance.rate = 1
   utterance.pitch = 1
 
+  utterance.onend = () => {
+    isSpeaking.value = false
+    currentUtterance = null
+  }
+
+  utterance.onerror = () => {
+    isSpeaking.value = false
+    currentUtterance = null
+  }
+
+  currentUtterance = utterance
   window.speechSynthesis.speak(utterance)
+  isSpeaking.value = true
   ElMessage.success('开始朗读')
 }
 
@@ -201,7 +229,7 @@ async function handleMoreCommand(command) {
       }
     } catch (error) {
       if (error !== 'cancel') {
-        console.error('删除消息失败:', error)
+        logger.error('删除消息失败:', error)
         ElMessage.error('删除失败')
       }
     }

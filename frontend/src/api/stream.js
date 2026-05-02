@@ -1,8 +1,9 @@
 import { parseError, getFriendlyErrorMessage } from '@/utils/errorHandler'
+import { logger } from '@/utils/logger'
 import { ElMessageBox } from 'element-plus'
 
 export async function fetchStream(apiPath, method, params, onMessage, onError, onComplete, abortController) {
-  // 🔑🔑🔑 关键：在发送请求前检查是否已登录
+ // 关键：在发送请求前检查是否已登录
   const token = localStorage.getItem('token')
   if (!token) {
     ElMessageBox.alert(
@@ -12,12 +13,12 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
         confirmButtonText: '去登录',
         type: 'warning',
         callback: () => {
-          // 🔑 触发自定义事件打开登录对话框
+ // 触发自定义事件打开登录对话框
           window.dispatchEvent(new CustomEvent('show-login-dialog'))
         }
       }
     )
-    // 调用onError让上层知道请求被取消了
+ // 调用onError让上层知道请求被取消了
     onError(new Error('未登录'))
     return
   }
@@ -65,7 +66,9 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
         } catch {
           backendErrorMsg = errorBody.substring(0, 200)
         }
-      } catch {}
+      } catch {
+        backendErrorMsg = `HTTP ${response.status}`
+      }
 
       const httpError = new Error(backendErrorMsg || `HTTP ${response.status}`)
       httpError.status = response.status
@@ -109,7 +112,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
             })
           }
         } catch (e) {
-          console.error('[Stream] 解析init数据失败:', e)
+          logger.error('[Stream] 解析init数据失败:', e)
         }
 
         return
@@ -157,7 +160,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
             isError: false
           })
         } catch (e) {
-          console.error('[Stream] 解析toolUsage失败:', e)
+          logger.error('[Stream] 解析toolUsage失败:', e)
         }
 
         return
@@ -179,14 +182,14 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
             isError: false
           })
         } catch (e) {
-          console.error('[Stream] 解析toolResponse失败:', e)
+          logger.error('[Stream] 解析toolResponse失败:', e)
         }
 
         return
       }
 
       if (normalizedEventType === 'error') {
-        // 🔑 解析错误数据，提取 code 和 message
+ // 解析错误数据，提取 code 和 message
         let errorContent = trimmedData.substring(0, 500)
         let errorCode = null
         
@@ -195,10 +198,10 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
           errorCode = parsedError.code
           errorContent = parsedError.message || parsedError.msg || parsedError.data || trimmedData
         } catch {
-          // 如果不是JSON格式，使用原始数据
+ // 如果不是JSON格式，使用原始数据
         }
         
-        // 🔑 使用错误处理工具获取友好提示
+ // 使用错误处理工具获取友好提示
         const friendlyMessage = getFriendlyErrorMessage(errorCode, errorContent)
         
         onMessage({

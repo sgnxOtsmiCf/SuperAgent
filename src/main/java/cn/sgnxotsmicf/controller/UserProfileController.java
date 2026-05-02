@@ -31,28 +31,27 @@ public class UserProfileController {
 
 
     @Operation(summary = "获取用户画像")
-    @GetMapping("/{userId}")
+    @GetMapping
     @SaCheckLogin
-    public Result<UserProfileVo> getUserProfile(@PathVariable Long userId) {
-        return userProfileService.getUserProfile(userId);
+    public Result<UserProfileVo> getUserProfile() {
+        return userProfileService.getUserProfile();
     }
 
 
     @Operation(summary = "更新用户画像维度（全量覆盖该维度的所有条目）")
-    @PutMapping("/{userId}")
+    @PutMapping
     @SaCheckLogin
-    public Result<UserProfileVo> updateUserProfile(@PathVariable Long userId, @RequestBody UserProfileServiceImpl.UpdateProfileRequest request) {
-        return userProfileService.updateUserProfile(userId, request);
+    public Result<UserProfileVo> updateUserProfile(@RequestBody UserProfileServiceImpl.UpdateProfileRequest request) {
+        return userProfileService.updateUserProfile(request);
     }
 
 
     @Operation(summary = "删除用户画像维度或条目")
-    @DeleteMapping("/{userId}")
+    @DeleteMapping
     @SaCheckLogin
-    public Result<UserProfileVo> deleteUserProfile(@PathVariable Long userId,
-                                                   @RequestParam String dimension,
+    public Result<UserProfileVo> deleteUserProfile(@RequestParam String dimension,
                                                    @RequestParam(required = false) String value){
-        return userProfileService.deleteUserProfile(userId, dimension, value);
+        return userProfileService.deleteUserProfile(dimension, value);
     }
 
 }

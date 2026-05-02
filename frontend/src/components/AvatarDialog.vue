@@ -54,6 +54,7 @@ import { Close, UserFilled, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { userApi } from '@/api/user'
+import { logger } from '@/utils/logger'
 
 const emit = defineEmits(['close', 'success'])
 const userStore = useUserStore()
@@ -67,7 +68,7 @@ function handleFileChange(file) {
   if (file) {
     selectedFile.value = file.raw
 
-    // 创建预览URL
+ // 创建预览URL
     const reader = new FileReader()
     reader.onload = (e) => {
       previewUrl.value = e.target.result
@@ -82,13 +83,13 @@ async function handleSave() {
   isLoading.value = true
 
   try {
-    // 🔑🔑🔑 调用后端API上传头像到minio
+ // 调用后端API上传头像到minio
     const res = await userApi.fileUpload(selectedFile.value)
 
-    // 后端返回的是minio图片地址
+ // 后端返回的是minio图片地址
     const avatarUrl = res.data
 
-    // 更新用户信息（保存minio地址）
+ // 更新用户信息（保存minio地址）
     userStore.setUserInfo({
       ...userStore.userInfo,
       avatar: avatarUrl
@@ -99,7 +100,7 @@ async function handleSave() {
     emit('close')
 
   } catch (error) {
-    console.error('头像上传失败:', error)
+    logger.error('头像上传失败:', error)
     ElMessage.error('头像上传失败，请重试')
   } finally {
     isLoading.value = false

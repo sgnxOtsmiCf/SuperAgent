@@ -108,18 +108,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public String fileSelect(Long userId) {
+    public String fileSelect() {
+        Long userId = serviceUtil.getUserId();
         User user = userMapper.selectById(userId);
         return user.getAvatar();
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result<String> updatePassword(Long userId, String password, String newPassword) {
-        Long realUserId = serviceUtil.getUserId();
-        if (!Objects.equals(realUserId, userId)) {
-            return Result.build(ResultCodeEnum.PERMISSION);
-        }
+    public Result<String> updatePassword(String password, String newPassword) {
+        Long userId = serviceUtil.getUserId();
         User user = getOne(lambdaQuery().eq(User::getId, userId).eq(User::getIsDeleted, 0));
         if (user == null) {
             return Result.build(ResultCodeEnum.PERMISSION);
@@ -136,7 +134,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public Result<UserVo> getUserInfo(Long userId) {
+    public Result<UserVo> getUserInfo() {
+        Long userId = serviceUtil.getUserId();
         User user = lambdaQuery()
                 .eq(User::getId, userId)
                 .eq(User::getIsDeleted, 0)

@@ -1,3 +1,4 @@
+import { logger } from '@/utils/logger'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useChatStore } from './chat'
@@ -19,15 +20,15 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function logout() {
-    // 🔑🔑🔑 关键：登出时清理 chat store 的会话数据
+ // 关键：登出时清理 chat store 的会话数据
     try {
       const chatStore = useChatStore()
       chatStore.clearAllSessions()
     } catch (e) {
-      console.warn('[UserStore] 清理 chat store 失败:', e)
+      logger.warn('[UserStore] 清理 chat store 失败:', e)
     }
 
-    // 清理用户数据
+ // 清理用户数据
     token.value = ''
     userInfo.value = {}
     isLoggedIn.value = false

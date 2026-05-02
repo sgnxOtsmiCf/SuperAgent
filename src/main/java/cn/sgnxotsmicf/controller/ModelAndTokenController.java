@@ -45,6 +45,7 @@ public class ModelAndTokenController {
         return modelAndTokenService.saveModelConfig(modelConfig);
     }
 
+    @SaCheckLogin
     @Operation(summary = "获取可用模型列表(支持分组/供应商/类型/关键字/分页筛选)")
     @GetMapping("/list")
     public Result<IPage<ModelVo>> getModelList(
@@ -57,6 +58,7 @@ public class ModelAndTokenController {
         return modelAndTokenService.getModelList(groupId, providerId, modelType, keyword, pageNo, pageSize);
     }
 
+    @SaCheckLogin
     @Operation(summary = "获取供应商列表（含下属模型，支持分页）")
     @GetMapping("/providers")
     public Result<IPage<ModelProviderVo>> getModelProviders(
@@ -65,6 +67,7 @@ public class ModelAndTokenController {
         return modelAndTokenService.getModelProviders(pageNo, pageSize);
     }
 
+    @SaCheckLogin
     @Operation(summary = "获取分组列表（含下属模型，支持分页）")
     @GetMapping("/groups")
     public Result<IPage<ModelGroupVo>> getModelGroups(

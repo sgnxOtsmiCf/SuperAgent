@@ -51,6 +51,7 @@
 import { ref } from 'vue'
 import { Close, Message, Clock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { logger } from '@/utils/logger'
 
 defineEmits(['close'])
 
@@ -68,7 +69,7 @@ async function copyEmail() {
       copied.value = false
     }, 2000)
   } catch (error) {
-    console.error('复制失败:', error)
+    logger.error('复制失败:', error)
     ElMessage.error('复制失败，请手动复制')
   }
 }

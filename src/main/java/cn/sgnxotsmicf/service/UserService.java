@@ -29,11 +29,11 @@ public interface UserService extends IService<User> {
 
     String uploadFile(MultipartFile file);
 
-    String fileSelect(Long userId);
+    String fileSelect();
 
-    Result<String> updatePassword(Long userId, String password, String newPassword);
+    Result<String> updatePassword(String password, String newPassword);
 
-    Result<UserVo> getUserInfo(Long userId);
+    Result<UserVo> getUserInfo();
 
     Result<String> updateUserInfo(UserVo userVo);
 }

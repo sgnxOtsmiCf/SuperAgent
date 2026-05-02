@@ -148,21 +148,19 @@ public class UserController {
 
     /**
      * minio图片头像文件查询
-     * @param userId 用户id
      * @return 响应地址
      */
     @Operation(summary = "minio图片头像文件查询")
     @GetMapping("/getAvatarUrl")
     @SaCheckLogin
-    public Result<String> fileSelect(@RequestParam("userId") Long userId) {
-        String fileUrl = userService.fileSelect(userId);
+    public Result<String> fileSelect() {
+        String fileUrl = userService.fileSelect();
         return Result.ok(fileUrl);
     }
 
 
     /**
      * 修改密码
-     * @param userId 用户id
      * @param password 密码
      * @param newPassword 新密码
      * @return 修改状态
@@ -170,16 +168,16 @@ public class UserController {
     @Operation(summary = "修改密码")
     @SaCheckLogin
     @PutMapping("/password")
-    public Result<String> updatePassword(@RequestParam("userId") Long userId, @RequestParam("password") String password, @RequestParam("newPassword") String newPassword) {
-        return userService.updatePassword(userId, password, newPassword);
+    public Result<String> updatePassword(@RequestParam("password") String password, @RequestParam("newPassword") String newPassword) {
+        return userService.updatePassword(password, newPassword);
     }
 
 
     @Operation(summary = "获取用户基本信息")
     @SaCheckLogin
     @GetMapping
-    public Result<UserVo> getUserInfo(@RequestParam("userId") Long userId) {
-        return userService.getUserInfo(userId);
+    public Result<UserVo> getUserInfo() {
+        return userService.getUserInfo();
     }
 
     @Operation(summary = "更新用户基本信息")

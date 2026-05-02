@@ -107,22 +107,22 @@ export function getFriendlyErrorMessage(code, originalMessage) {
   
   const codeNum = typeof code === 'string' ? parseInt(code, 10) : code
   
-  // 系统错误 - 添加"稍后重试"提示
+ // 系统错误 - 添加"稍后重试"提示
   if (SYSTEM_ERROR_CODES.includes(codeNum)) {
     const baseMessage = originalMessage || '服务暂时不可用'
-    // 如果原始消息已经包含"稍后"或"重试"，则不再添加
+ // 如果原始消息已经包含"稍后"或"重试"，则不再添加
     if (baseMessage.includes('稍后') || baseMessage.includes('重试')) {
       return baseMessage
     }
     return `${baseMessage}，请稍后重试`
   }
   
-  // 权限错误 - 直接返回原始消息
+ // 权限错误 - 直接返回原始消息
   if (AUTH_ERROR_CODES.includes(codeNum)) {
     return originalMessage || '权限验证失败'
   }
   
-  // 会话错误 - 添加"稍后重试"提示
+ // 会话错误 - 添加"稍后重试"提示
   if (SESSION_ERROR_CODES.includes(codeNum)) {
     const baseMessage = originalMessage || '会话操作失败'
     if (baseMessage.includes('稍后') || baseMessage.includes('重试')) {
@@ -131,7 +131,7 @@ export function getFriendlyErrorMessage(code, originalMessage) {
     return `${baseMessage}，请稍后重试`
   }
   
-  // 消息错误 - 添加"稍后重试"提示
+ // 消息错误 - 添加"稍后重试"提示
   if (MESSAGE_ERROR_CODES.includes(codeNum)) {
     const baseMessage = originalMessage || '消息操作失败'
     if (baseMessage.includes('稍后') || baseMessage.includes('重试')) {
@@ -140,7 +140,7 @@ export function getFriendlyErrorMessage(code, originalMessage) {
     return `${baseMessage}，请稍后重试`
   }
   
-  // 文件错误 - 添加"稍后重试"提示
+ // 文件错误 - 添加"稍后重试"提示
   if (FILE_ERROR_CODES.includes(codeNum)) {
     const baseMessage = originalMessage || '文件操作失败'
     if (baseMessage.includes('稍后') || baseMessage.includes('重试')) {
@@ -149,12 +149,12 @@ export function getFriendlyErrorMessage(code, originalMessage) {
     return `${baseMessage}，请稍后重试`
   }
   
-  // 验证码错误 - 直接返回原始消息
+ // 验证码错误 - 直接返回原始消息
   if (CAPTCHA_ERROR_CODES.includes(codeNum)) {
     return originalMessage || '验证码错误'
   }
   
-  // 默认处理
+ // 默认处理
   return originalMessage || '操作失败，请稍后重试'
 }
 
@@ -167,7 +167,7 @@ export function parseError(error) {
   let code = null
   let message = ''
   
-  // 尝试从错误对象中提取代码和消息
+ // 尝试从错误对象中提取代码和消息
   if (error?.response?.data) {
     code = error.response.data.code
     message = error.response.data.message || error.response.data.msg
@@ -175,7 +175,7 @@ export function parseError(error) {
     code = error.code
     message = error.message
   } else if (typeof error === 'string') {
-    // 尝试解析JSON错误
+ // 尝试解析JSON错误
     try {
       const parsed = JSON.parse(error)
       code = parsed.code

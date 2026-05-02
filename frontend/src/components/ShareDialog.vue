@@ -182,7 +182,9 @@ import { ref, computed, nextTick } from 'vue'
 import { Close, InfoFilled, Picture, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import html2canvas from 'html2canvas'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   messages: {
@@ -203,18 +205,18 @@ const htmlContainerRef = ref(null)
 const messageListRef = ref(null)
 const isGenerating = ref(false)
 
-// 🔑🔑🔑 解析消息，提取工具调用信息（根据前端实际存储结构）
+// 解析消息，提取工具调用信息（根据前端实际存储结构）
 const displayItems = computed(() => {
   const items = []
   
   props.messages.forEach((msg, index) => {
-    // 🔑 优先使用 messageType，如果没有则根据 role 推断
+ // 优先使用 messageType，如果没有则根据 role 推断
     let messageType = msg.messageType
     if (!messageType && msg.role) {
       messageType = msg.role.toUpperCase()
     }
     
-    // 用户消息 (messageType: "USER" 或 role: "user")
+ // 用户消息 (messageType: "USER" 或 role: "user")
     if (messageType === 'USER' || msg.role === 'user') {
       items.push({
         type: 'user',
@@ -223,9 +225,9 @@ const displayItems = computed(() => {
         toolName: null
       })
     }
-    // 助手消息 (messageType: "ASSISTANT" 或 role: "assistant")
+ // 助手消息 (messageType: "ASSISTANT" 或 role: "assistant")
     else if (messageType === 'ASSISTANT' || msg.role === 'assistant') {
-      // 添加助手文本内容
+ // 添加助手文本内容
       if (msg.content) {
         items.push({
           type: 'assistant',
@@ -235,11 +237,11 @@ const displayItems = computed(() => {
         })
       }
       
-      // 🔑 从 metadata.toolUsages 中提取工具调用信息（前端存储的字段名）
+ // 从 metadata.toolUsages 中提取工具调用信息（前端存储的字段名）
       const toolUsages = msg.metadata?.toolUsages || []
       const toolResponses = msg.metadata?.toolResponses || []
       
-      // 添加工具调用
+ // 添加工具调用
       toolUsages.forEach((tool) => {
         items.push({
           type: 'toolUsage',
@@ -251,7 +253,7 @@ const displayItems = computed(() => {
         })
       })
       
-      // 🔑 添加工具返回结果（从前端 metadata.toolResponses 获取）
+ // 添加工具返回结果（从前端 metadata.toolResponses 获取）
       toolResponses.forEach((response) => {
         items.push({
           type: 'toolResponse',
@@ -294,7 +296,7 @@ function formatToolArgs(args) {
 function formatToolResponse(data) {
   if (!data) return '无返回数据'
   if (typeof data === 'string') {
-    // 尝试解析 JSON
+ // 尝试解析 JSON
     try {
       const parsed = JSON.parse(data)
       return JSON.stringify(parsed, null, 2)
@@ -309,13 +311,17 @@ function formatToolResponse(data) {
   }
 }
 
-// 🔑🔑🔑 渲染 Markdown
+// 渲染 Markdown
 function renderMarkdown(content) {
   if (!content) return ''
   try {
-    return marked.parse(content, { async: false })
+    const rawHtml = marked.parse(content, { async: false })
+    return DOMPurify.sanitize(typeof rawHtml === 'string' ? rawHtml : String(rawHtml), {
+      ADD_TAGS: ['pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'div'],
+      ADD_ATTR: ['class', 'language']
+    })
   } catch (e) {
-    return content
+    return DOMPurify.sanitize(content)
   }
 }
 
@@ -349,7 +355,7 @@ function initSelection() {
     const currentMsg = props.messages[props.initialMessageIndex]
     selectedIndices.value.add(props.initialMessageIndex)
     
-    // 查找最近一条其他角色的消息
+ // 查找最近一条其他角色的消息
     const otherRole = currentMsg.role === 'user' ? 'assistant' : 'user'
     let nearestIndex = -1
     let minDistance = Infinity
@@ -383,7 +389,7 @@ function toggleSelection(index) {
 
 function truncateContent(content, maxLength) {
   if (!content) return ''
-  // 移除 Markdown 标记
+ // 移除 Markdown 标记
   const plainText = content.replace(/[#*`\[\]()]/g, '').replace(/\n/g, ' ')
   if (plainText.length <= maxLength) return plainText
   return plainText.substring(0, maxLength) + '...'
@@ -393,24 +399,24 @@ function handleClose() {
   emit('close')
 }
 
-// 🔑🔑🔑 生成分享图片（使用 html2canvas）
+// 生成分享图片（使用 html2canvas）
 async function generateImage() {
   if (selectedIndices.value.size === 0) {
     ElMessage.warning('请至少选择一条消息')
     return
   }
 
-  // 先显示预览对话框，渲染 HTML
+ // 先显示预览对话框，渲染 HTML
   showImagePreview.value = true
   
-  // 等待 DOM 更新和 Markdown 渲染
+ // 等待 DOM 更新和 Markdown 渲染
   await nextTick()
   await new Promise(resolve => setTimeout(resolve, 300))
   
   ElMessage.success('预览已生成，点击下载按钮保存图片')
 }
 
-// 🔑🔑🔑 下载图片
+// 下载图片
 async function downloadImage() {
   if (!htmlContainerRef.value) {
     ElMessage.error('生成区域未找到')
@@ -425,7 +431,7 @@ async function downloadImage() {
       throw new Error('分享卡片未找到')
     }
     
-    // 使用 html2canvas 生成图片
+ // 使用 html2canvas 生成图片
     const canvas = await html2canvas(element, {
       backgroundColor: '#f8f9fa',
       scale: 2, // 高清输出
@@ -436,7 +442,7 @@ async function downloadImage() {
       width: 800
     })
     
-    // 下载图片
+ // 下载图片
     const link = document.createElement('a')
     link.download = `对话分享_${new Date().getTime()}.png`
     link.href = canvas.toDataURL('image/png')
@@ -444,7 +450,7 @@ async function downloadImage() {
     
     ElMessage.success('图片已下载')
   } catch (error) {
-    console.error('生成图片失败:', error)
+    logger.error('生成图片失败:', error)
     ElMessage.error('生成图片失败: ' + error.message)
   } finally {
     isGenerating.value = false
@@ -671,7 +677,7 @@ async function downloadImage() {
   gap: 12px;
 }
 
-// 🔑🔑🔑 分享卡片样式（用于 html2canvas 截图）
+// 分享卡片样式（用于 html2canvas 截图）
 .share-card {
   background-color: #f8f9fa;
   border-radius: 12px;
@@ -786,26 +792,32 @@ async function downloadImage() {
 
 .message-content {
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.7;
   word-wrap: break-word;
 
-  // Markdown 样式
+ // Markdown 样式
   :deep(h1), :deep(h2), :deep(h3), :deep(h4), :deep(h5), :deep(h6) {
-    margin: 16px 0 12px;
-    font-weight: 600;
-    line-height: 1.4;
+    margin: 18px 0 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #111827;
   }
 
-  :deep(h1) { font-size: 20px; }
-  :deep(h2) { font-size: 18px; }
-  :deep(h3) { font-size: 16px; }
+  :deep(h1) { font-size: 21px; }
+  :deep(h2) {
+    font-size: 18px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e5e7eb;
+  }
+  :deep(h3) { font-size: 16px; color: #1e40af; }
 
   :deep(p) {
     margin: 8px 0;
   }
 
   :deep(strong) {
-    font-weight: 600;
+    font-weight: 700;
+    color: #111827;
   }
 
   :deep(em) {
@@ -813,23 +825,28 @@ async function downloadImage() {
   }
 
   :deep(code) {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: #fef2f2;
+    color: #dc2626;
     padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'Monaco', 'Menlo', monospace;
+    border-radius: 5px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
     font-size: 13px;
+    border: 1px solid #fecaca;
   }
 
   :deep(pre) {
-    background-color: #f4f4f5;
-    padding: 16px;
-    border-radius: 8px;
+    background-color: #0d1117;
+    padding: 18px;
+    border-radius: 10px;
     overflow-x: auto;
-    margin: 12px 0;
+    margin: 14px 0;
+    border: 1px solid #30363d;
 
     code {
       background: none;
       padding: 0;
+      color: #e6edf3;
+      border: none;
     }
   }
 
@@ -843,31 +860,47 @@ async function downloadImage() {
   }
 
   :deep(blockquote) {
-    border-left: 4px solid #e5e7eb;
-    margin: 12px 0;
-    padding-left: 16px;
-    color: #6b7280;
+    border-left: 4px solid #8b5cf6;
+    margin: 14px 0;
+    padding: 12px 16px;
+    color: #1e3a5f;
+    background-color: #f5f3ff;
+    border-radius: 0 8px 8px 0;
   }
 
   :deep(a) {
-    color: #1890ff;
+    color: #2563eb;
     text-decoration: none;
   }
 
   :deep(table) {
     width: 100%;
-    border-collapse: collapse;
-    margin: 12px 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 14px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    font-size: 13px;
 
     th, td {
-      border: 1px solid #e5e7eb;
-      padding: 8px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      border-right: 1px solid #f3f4f6;
+      padding: 10px 14px;
       text-align: left;
+
+      &:last-child { border-right: none; }
     }
 
     th {
-      background-color: #f9fafb;
+      background-color: #f1f5f9;
       font-weight: 600;
+      color: #1e293b;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f9fafb;
     }
   }
 }
@@ -940,14 +973,5 @@ async function downloadImage() {
   text-align: center;
   color: #9ca3af;
   font-size: 13px;
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
 }
 </style>

@@ -35,10 +35,11 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                                         "/user/login",
                                         "/user/registerPre",
                                         "/user/register",
-                                        "/user/logout",
                                         "/user/LoginWithPhoneCodePre",
                                         "/error",
-                                        "/captcha/*"
+                                        "/captcha/*",
+                                        "/version/**",
+                                        "/user/logout"
                                 )
                                 .check(r -> StpUtil.checkLogin());
 

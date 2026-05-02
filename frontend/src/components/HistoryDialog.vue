@@ -67,6 +67,7 @@ import { Close, Search, ChatDotRound, Document } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
 import { sessionApi } from '@/api/session'
 import { ElMessage } from 'element-plus'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   appKey: {
@@ -103,11 +104,11 @@ async function loadAllSessions() {
   isLoading.value = true
   
   try {
-    // 🔑 调用后端API获取所有会话
+ // 调用后端API获取所有会话
     const agentId = chatStore.appConfig[props.appKey]?.agentId
     if (!agentId) {
-      console.error('[HistoryDialog] 未找到agentId:', props.appKey)
-      // 回退到从store获取
+      logger.error('[HistoryDialog] 未找到agentId:', props.appKey)
+ // 回退到从store获取
       allSessions.value = chatStore.getSessionHistory(props.appKey)
       return
     }
@@ -115,7 +116,7 @@ async function loadAllSessions() {
     const res = await sessionApi.getAllSessions(agentId)
     
     if (res.code === 200 && Array.isArray(res.data)) {
-      // 转换后端数据格式为前端格式
+ // 转换后端数据格式为前端格式
       allSessions.value = res.data.map(session => ({
         sessionId: session.sessionId,
         agentId: session.agentId || 1,
@@ -127,13 +128,13 @@ async function loadAllSessions() {
         messages: [] // 历史对话框不需要显示消息内容
       }))
     } else {
-      // 回退到从store获取
+ // 回退到从store获取
       allSessions.value = chatStore.getSessionHistory(props.appKey)
     }
   } catch (error) {
-    console.error('[HistoryDialog] 加载所有会话失败:', error)
+    logger.error('[HistoryDialog] 加载所有会话失败:', error)
     ElMessage.error('加载历史会话失败')
-    // 回退到从store获取
+ // 回退到从store获取
     allSessions.value = chatStore.getSessionHistory(props.appKey)
   } finally {
     isLoading.value = false
@@ -147,18 +148,18 @@ function formatTime(timeStr) {
   const now = new Date()
   const diff = now - date
   
-  // 小于24小时显示"今天 HH:mm"
+ // 小于24小时显示"今天 HH:mm"
   if (diff < 86400000) {
     return `今天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
   }
   
-  // 小于7天显示"星期X HH:mm"
+ // 小于7天显示"星期X HH:mm"
   if (diff < 604800000) {
     const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
     return `${days[date.getDay()]} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
   }
   
-  // 其他情况显示完整日期
+ // 其他情况显示完整日期
   return `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
@@ -167,7 +168,7 @@ function getPreview(session) {
     return '暂无消息内容'
   }
   
-  // 获取第一条用户消息或最后一条AI回复作为预览
+ // 获取第一条用户消息或最后一条AI回复作为预览
   const lastMessage = session.messages[session.messages.length - 1]
   if (lastMessage && lastMessage.content) {
     return lastMessage.content.substring(0, 100) + (lastMessage.content.length > 100 ? '...' : '')
@@ -343,14 +344,5 @@ function formatFileSize(bytes) {
       margin: 0;
     }
   }
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
 }
 </style>

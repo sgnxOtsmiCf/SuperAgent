@@ -141,6 +141,7 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, Search, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { modelApi } from '@/api/model'
+import { logger } from '@/utils/logger'
 
 const router = useRouter()
 const loading = ref(false)
@@ -185,7 +186,7 @@ async function fetchModels() {
       pagination.total = 0
     }
   } catch (error) {
-    console.error('获取模型列表失败:', error)
+    logger.error('获取模型列表失败:', error)
     ElMessage.error('获取模型列表失败')
   } finally {
     loading.value = false
@@ -221,7 +222,7 @@ async function fetchProviders() {
       providers.value = res.data.records || res.data || []
     }
   } catch (error) {
-    console.error('获取供应商列表失败:', error)
+    logger.error('获取供应商列表失败:', error)
   }
 }
 
@@ -232,7 +233,7 @@ async function fetchGroups() {
       groups.value = res.data.records || res.data || []
     }
   } catch (error) {
-    console.error('获取分组列表失败:', error)
+    logger.error('获取分组列表失败:', error)
   }
 }
 

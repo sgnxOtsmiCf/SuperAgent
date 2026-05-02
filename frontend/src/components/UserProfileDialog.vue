@@ -127,6 +127,7 @@ import { Close, Loading, User, Plus, Edit, Delete } from '@element-plus/icons-vu
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { userProfileApi } from '@/api/userProfile'
+import { logger } from '@/utils/logger'
 
 const emit = defineEmits(['close'])
 const userStore = useUserStore()
@@ -156,7 +157,7 @@ async function loadUserProfile() {
       ElMessage.error(res.message || '获取用户画像失败')
     }
   } catch (error) {
-    console.error('获取用户画像失败:', error)
+    logger.error('获取用户画像失败:', error)
   } finally {
     loading.value = false
   }
@@ -224,7 +225,7 @@ async function saveNewDimension() {
       await loadUserProfile()
     }
   } catch (error) {
-    console.error('添加维度失败:', error)
+    logger.error('添加维度失败:', error)
   } finally {
     savingNew.value = false
   }
@@ -262,7 +263,7 @@ async function saveEditDimension(dim) {
       await loadUserProfile()
     }
   } catch (error) {
-    console.error('更新维度失败:', error)
+    logger.error('更新维度失败:', error)
   } finally {
     dim.saving = false
   }
@@ -278,7 +279,7 @@ async function handleDeleteDimension(dim) {
       await loadUserProfile()
     }
   } catch (error) {
-    console.error('删除维度失败:', error)
+    logger.error('删除维度失败:', error)
   } finally {
     dim.deleting = false
   }
@@ -293,7 +294,7 @@ async function handleDeleteEntry(dim, entry) {
       await loadUserProfile()
     }
   } catch (error) {
-    console.error('删除条目失败:', error)
+    logger.error('删除条目失败:', error)
   }
 }
 

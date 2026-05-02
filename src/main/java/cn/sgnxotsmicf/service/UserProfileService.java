@@ -15,9 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 public interface UserProfileService {
 
-    Result<UserProfileVo> getUserProfile(Long userId);
+    Result<UserProfileVo> getUserProfile();
 
-    Result<UserProfileVo> updateUserProfile(Long userId, UserProfileServiceImpl.UpdateProfileRequest request);
+    Result<UserProfileVo> updateUserProfile(UserProfileServiceImpl.UpdateProfileRequest request);
 
-    Result<UserProfileVo> deleteUserProfile(Long userId, String dimension, String value);
+    Result<UserProfileVo> deleteUserProfile(String dimension, String value);
 }

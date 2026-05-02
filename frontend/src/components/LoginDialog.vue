@@ -246,6 +246,7 @@ import { Close, Loading, CircleCheck, CircleClose } from '@element-plus/icons-vu
 import { ElMessage } from 'element-plus'
 import { userApi } from '@/api/user'
 import { useUserStore } from '@/stores/user'
+import { logger } from '@/utils/logger'
 
 const emit = defineEmits(['close'])
 const userStore = useUserStore()
@@ -367,14 +368,14 @@ const phoneRegisterRules = {
 async function refreshCaptcha() {
   try {
     const res = await userApi.generateCaptcha()
-    console.log('验证码接口返回:', res)
+    logger.log('验证码接口返回:', res)
     if (res.data) {
       captchaId.value = res.data.captchaId
       captchaImage.value = res.data.captchaImage
-      console.log('captchaImage 前50字符:', res.data.captchaImage?.substring(0, 50))
+      logger.log('captchaImage 前50字符:', res.data.captchaImage?.substring(0, 50))
     }
   } catch (error) {
-    console.error('获取验证码失败:', error)
+    logger.error('获取验证码失败:', error)
     ElMessage.error('获取验证码失败')
   }
 }
@@ -394,20 +395,20 @@ onMounted(() => {
 function switchToRegister() {
   isLogin.value = false
 
-  // 清空注册表单
+ // 清空注册表单
   registerFormData.username = ''
   registerFormData.password = ''
   registerFormData.captchaCode = ''
 
-  // 清空手机号注册表单
+ // 清空手机号注册表单
   phoneRegisterFormData.phone = ''
   phoneRegisterFormData.verifyCode = ''
   phoneRegisterFormData.captchaCode = ''
 
-  // 重置用户名校验状态
+ // 重置用户名校验状态
   resetUsernameCheck()
 
-  // 清除验证提示
+ // 清除验证提示
   if (registerFormRef.value) {
     registerFormRef.value.clearValidate()
   }
@@ -486,7 +487,7 @@ async function checkUsername() {
       usernameChecked.value = true
     }
   } catch (error) {
-    console.error('用户名校验请求失败:', error)
+    logger.error('用户名校验请求失败:', error)
     resetUsernameCheck()
   } finally {
     isCheckingUsername.value = false
@@ -517,7 +518,7 @@ async function handleLogin() {
     if (res.data && res.data.tokenValue) {
       userStore.setToken(res.data.tokenValue)
 
-      // 🔑🔑🔑 关键：登录成功后获取完整的用户信息
+ // 关键：登录成功后获取完整的用户信息
       const userId = res.data.loginId || loginFormData.username
       let userInfo = {
         username: loginFormData.username,
@@ -535,15 +536,15 @@ async function handleLogin() {
           }
         }
       } catch (userError) {
-        console.warn('[LoginDialog] ⚠️ 获取用户信息失败:', userError)
-        // 如果获取用户信息失败，尝试只获取头像
+        logger.warn('[LoginDialog] ⚠️ 获取用户信息失败:', userError)
+ // 如果获取用户信息失败，尝试只获取头像
         try {
           const avatarRes = await userApi.getAvatarUrl(userId)
           if (avatarRes.data) {
             userInfo.avatar = avatarRes.data
           }
         } catch (avatarError) {
-          console.warn('[LoginDialog] ⚠️ 获取头像失败:', avatarError)
+          logger.warn('[LoginDialog] ⚠️ 获取头像失败:', avatarError)
         }
       }
 
@@ -552,7 +553,7 @@ async function handleLogin() {
       emit('close')
     }
   } catch (error) {
-    console.error('登录失败:', error)
+    logger.error('登录失败:', error)
     refreshCaptcha()
     loginFormData.captchaCode = ''
   } finally {
@@ -588,13 +589,13 @@ async function handleRegister() {
 
     ElMessage.success('注册成功！请登录')
 
-    // 注册成功后切换到登录模式，清空所有数据
+ // 注册成功后切换到登录模式，清空所有数据
     setTimeout(() => {
       switchToLogin()
     }, 1000)
 
   } catch (error) {
-    console.error('注册失败:', error)
+    logger.error('注册失败:', error)
     refreshCaptcha()
     registerFormData.captchaCode = ''
   } finally {
@@ -629,7 +630,7 @@ async function sendCode() {
       }
     }, 1000)
   } catch (error) {
-    console.error('发送验证码失败:', error)
+    logger.error('发送验证码失败:', error)
   }
 }
 
@@ -660,7 +661,7 @@ async function sendPhoneRegisterCode() {
       }
     }, 1000)
   } catch (error) {
-    console.error('发送验证码失败:', error)
+    logger.error('发送验证码失败:', error)
   }
 }
 
@@ -688,7 +689,7 @@ async function handlePhoneLogin() {
     if (res.data && res.data.tokenValue) {
       userStore.setToken(res.data.tokenValue)
 
-      // 🔑🔑🔑 关键：登录成功后获取完整的用户信息
+ // 关键：登录成功后获取完整的用户信息
       const userId = res.data.loginId || phoneFormData.phone
       let userInfo = {
         phone: phoneFormData.phone,
@@ -706,15 +707,15 @@ async function handlePhoneLogin() {
           }
         }
       } catch (userError) {
-        console.warn('[LoginDialog] ⚠️ 获取用户信息失败:', userError)
-        // 如果获取用户信息失败，尝试只获取头像
+        logger.warn('[LoginDialog] ⚠️ 获取用户信息失败:', userError)
+ // 如果获取用户信息失败，尝试只获取头像
         try {
           const avatarRes = await userApi.getAvatarUrl(userId)
           if (avatarRes.data) {
             userInfo.avatar = avatarRes.data
           }
         } catch (avatarError) {
-          console.warn('[LoginDialog] ⚠️ 获取头像失败:', avatarError)
+          logger.warn('[LoginDialog] ⚠️ 获取头像失败:', avatarError)
         }
       }
 
@@ -723,7 +724,7 @@ async function handlePhoneLogin() {
       emit('close')
     }
   } catch (error) {
-    console.error('手机号登录失败:', error)
+    logger.error('手机号登录失败:', error)
     refreshCaptcha()
     phoneFormData.captchaCode = ''
   } finally {
@@ -754,13 +755,13 @@ async function handlePhoneRegister() {
 
     ElMessage.success('注册成功！请登录')
 
-    // 注册成功后切换到登录模式
+ // 注册成功后切换到登录模式
     setTimeout(() => {
       switchToLogin()
     }, 1000)
 
   } catch (error) {
-    console.error('手机号注册失败:', error)
+    logger.error('手机号注册失败:', error)
     refreshCaptcha()
     phoneRegisterFormData.captchaCode = ''
   } finally {

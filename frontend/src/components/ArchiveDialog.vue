@@ -235,13 +235,4 @@ function formatTime(timeStr) {
     color: #40a9ff;
   }
 }
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-}
 </style>

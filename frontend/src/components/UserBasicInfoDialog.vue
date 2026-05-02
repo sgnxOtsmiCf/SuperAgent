@@ -144,6 +144,49 @@
               />
             </div>
 
+            <div class="form-item">
+              <label class="form-label">Max Tokens (最大令牌数)</label>
+              <el-slider
+                v-model="formData.max_tokens"
+                :min="1000"
+                :max="500000"
+                :step="1000"
+                show-input
+                class="form-slider"
+              />
+            </div>
+
+            <div class="form-item">
+              <label class="form-label">Thinking Budget (思考预算)</label>
+              <el-slider
+                v-model="formData.thinking_budget"
+                :min="0"
+                :max="500000"
+                :step="1000"
+                show-input
+                class="form-slider"
+              />
+              <span class="form-tip">分配给模型推理过程的令牌数量</span>
+            </div>
+
+            <div class="form-item form-item-switch">
+              <label class="form-label">启用思考 (Enable Thinking)</label>
+              <el-switch
+                v-model="formData.enable_thinking"
+                active-text="开启"
+                inactive-text="关闭"
+              />
+            </div>
+
+            <div class="form-item form-item-switch">
+              <label class="form-label">启用搜索 (Enable Search)</label>
+              <el-switch
+                v-model="formData.enable_search"
+                active-text="开启"
+                inactive-text="关闭"
+              />
+            </div>
+
             <!-- AI参数保存按钮 -->
             <div class="ai-params-actions">
               <el-button 
@@ -173,6 +216,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { userApi } from '@/api/user'
 import { modelApi } from '@/api/model'
+import { logger } from '@/utils/logger'
 
 const emit = defineEmits(['close', 'user-updated'])
 const userStore = useUserStore()
@@ -223,7 +267,7 @@ async function loadModelConfig() {
       formData.enable_search = res.data.enableSearch !== undefined ? Boolean(res.data.enableSearch) : false
     }
   } catch (error) {
-    console.error('获取模型配置失败:', error)
+    logger.error('获取模型配置失败:', error)
   } finally {
     loadingModelConfig.value = false
   }
@@ -240,7 +284,7 @@ async function loadUserInfo() {
   try {
     const res = await userApi.getUserInfo(userStore.userInfo.userId)
     if (res.code === 200 && res.data) {
-      // 更新 store 中的用户信息
+ // 更新 store 中的用户信息
       userStore.setUserInfo({
         ...userStore.userInfo,
         ...res.data
@@ -248,11 +292,11 @@ async function loadUserInfo() {
       initFormData()
     } else {
       ElMessage.error(res.message || '获取用户信息失败')
-      // 使用 store 中的数据
+ // 使用 store 中的数据
       initFormData()
     }
   } catch (error) {
-    console.error('获取用户信息失败:', error)
+    logger.error('获取用户信息失败:', error)
     ElMessage.error('获取用户信息失败，使用本地缓存数据')
     initFormData()
   } finally {
@@ -284,37 +328,24 @@ async function handleAvatarChange(event) {
 
   uploadingAvatar.value = true
   try {
-    // 1. 先上传头像文件
+    // 上传头像文件，后端返回URL后直接更新本地状态
     const uploadRes = await userApi.fileUpload(file)
     if (uploadRes.code === 200 && uploadRes.data) {
       const avatarUrl = uploadRes.data
-      
-      // 2. 更新用户头像信息到后端
-      const userVo = {
-        username: formData.username,
-        nickName: formData.nickName,
-        avatar: avatarUrl,
-        phone: formData.phone
-      }
-      
-      const updateRes = await userApi.updateUserInfo(userVo)
-      if (updateRes.code === 200) {
-        // 3. 更新本地表单和store
-        formData.avatar = avatarUrl
-        userStore.setUserInfo({
-          ...userStore.userInfo,
-          avatar: avatarUrl
-        })
-        ElMessage.success('头像更新成功')
-        emit('user-updated', { avatar: avatarUrl })
-      } else {
-        ElMessage.error(updateRes.message || '头像信息保存失败')
-      }
+
+      // 更新本地表单和store
+      formData.avatar = avatarUrl
+      userStore.setUserInfo({
+        ...userStore.userInfo,
+        avatar: avatarUrl
+      })
+      ElMessage.success('头像更新成功')
+      emit('user-updated', { avatar: avatarUrl })
     } else {
       ElMessage.error(uploadRes.message || '头像上传失败')
     }
   } catch (error) {
-    console.error('头像上传失败:', error)
+    logger.error('头像上传失败:', error)
     ElMessage.error('头像上传失败，请重试')
   } finally {
     uploadingAvatar.value = false
@@ -327,7 +358,7 @@ async function handleAvatarChange(event) {
 async function saveSingleField(fieldName) {
   const value = formData[fieldName]
 
-  // 字段验证
+ // 字段验证
   if (fieldName === 'username') {
     if (!value || value.trim().length < 3) {
       ElMessage.warning('用户名至少需要3个字符')
@@ -348,7 +379,7 @@ async function saveSingleField(fieldName) {
 
   savingField.value = fieldName
   try {
-    // 只发送要更新的字段，其他字段为null
+ // 只发送要更新的字段，其他字段为null
     const userVo = {
       username: fieldName === 'username' ? value : null,
       nickName: fieldName === 'nickName' ? value : null,
@@ -358,7 +389,7 @@ async function saveSingleField(fieldName) {
 
     const res = await userApi.updateUserInfo(userVo)
     if (res.code === 200) {
-      // 更新 store 中的用户信息
+ // 更新 store 中的用户信息
       userStore.setUserInfo({
         ...userStore.userInfo,
         [fieldName]: value
@@ -369,7 +400,7 @@ async function saveSingleField(fieldName) {
       ElMessage.error(res.message || '更新失败')
     }
   } catch (error) {
-    console.error(`更新${fieldName}失败:`, error)
+    logger.error(`更新${fieldName}失败:`, error)
     ElMessage.error('更新失败，请重试')
   } finally {
     savingField.value = ''
@@ -402,7 +433,7 @@ async function saveAIParams() {
       ElMessage.error(res.message || '更新失败')
     }
   } catch (error) {
-    console.error('更新AI参数失败:', error)
+    logger.error('更新AI参数失败:', error)
     ElMessage.error('更新失败，请重试')
   } finally {
     savingAIParams.value = false
@@ -619,6 +650,16 @@ onMounted(() => {
     font-size: 12px;
     color: #999;
     line-height: 1.4;
+  }
+
+  &.form-item-switch {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+
+    .form-label {
+      margin-bottom: 0;
+    }
   }
 }
 

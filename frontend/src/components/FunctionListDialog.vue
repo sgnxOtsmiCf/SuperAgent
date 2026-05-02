@@ -51,6 +51,7 @@ import { ref, onMounted } from 'vue'
 import { Close, Loading, InfoFilled, Box, Tools, MagicStick } from '@element-plus/icons-vue'
 import { functionApi } from '@/api/function'
 import { ElMessage } from 'element-plus'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   type: {
@@ -88,7 +89,7 @@ async function loadData() {
       functionList.value = []
     }
   } catch (error) {
-    console.error(`[FunctionListDialog] 加载${props.type}列表失败:`, error)
+    logger.error(`[FunctionListDialog] 加载${props.type}列表失败:`, error)
     ElMessage.error(`加载${props.type === 'tools' ? '工具' : 'Skills'}列表失败`)
     functionList.value = []
   } finally {
@@ -251,14 +252,5 @@ onMounted(() => {
   to {
     transform: rotate(360deg);
   }
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
 }
 </style>

@@ -5,7 +5,7 @@
       <span class="logo-text">SuperAgent</span>
       <!-- 🔑 版本信息标签 -->
       <span class="version-tag" @click="showVersionDialog = true" title="点击查看版本详情">
-        {{ 'v'+(versionInfo.version || 'v1.0') }}
+        {{ 'v'+(versionInfo.version || '1.0') }}
       </span>
     </div>
 
@@ -271,6 +271,7 @@ import ArchiveDialog from './ArchiveDialog.vue'
 import FunctionListDialog from './FunctionListDialog.vue'
 import VersionDialog from './VersionDialog.vue'
 import UserProfileDialog from './UserProfileDialog.vue'
+import { logger } from '@/utils/logger'
 
 const chatStore = useChatStore()
 const userStore = useUserStore()
@@ -287,7 +288,7 @@ const showVersionDialog = ref(false)
 const showUserProfileDialog = ref(false)
 const functionDialogType = ref('tools')
 
-// 🔑 版本信息
+// 版本信息
 const versionInfo = ref({
   version: 'v1.0',
   author: '',
@@ -321,12 +322,12 @@ const currentHistory = computed(() => chatStore.getSessionHistory(chatStore.curr
 // 后端查询9条，如果返回9条说明有更多数据，需要显示"查看更多"
 const displayHistory = computed(() => {
   const history = [...currentHistory.value]
-  // 🔑 关键：后端已排序，前端只需截取前8条
-  // 排序规则：置顶最新的 → 置顶较早的 → 未置顶但最近活跃的 → 未置顶且不活跃的
+ // 关键：后端已排序，前端只需截取前8条
+ // 排序规则：置顶最新的 → 置顶较早的 → 未置顶但最近活跃的 → 未置顶且不活跃的
   return history.slice(0, 8)
 })
 
-// 🔑 是否有更多历史记录（后端返回9条说明有第9条，即还有更多）
+// 是否有更多历史记录（后端返回9条说明有第9条，即还有更多）
 const hasMoreHistory = computed(() => {
   return currentHistory.value.length > 8
 })
@@ -354,7 +355,7 @@ function loadSession(session) {
   if (guardStreamingAction()) return
 
   if (!session.sessionId) {
-    console.error('[Sidebar] ❌ sessionId为空！')
+    logger.error('[Sidebar] ❌ sessionId为空！')
     return
   }
 
@@ -370,7 +371,7 @@ function handleSelectArchivedSession(session) {
   showArchiveDialog.value = false
 
   if (!session.sessionId) {
-    console.error('[Sidebar] 归档会话缺少 sessionId')
+    logger.error('[Sidebar] 归档会话缺少 sessionId')
     return
   }
 
@@ -378,27 +379,27 @@ function handleSelectArchivedSession(session) {
 
   const sessionList = chatStore.sessions[appKey]
   if (!sessionList) {
-    console.error(`[Sidebar] sessions[${appKey}] 不存在`)
+    logger.error(`[Sidebar] sessions[${appKey}] 不存在`)
     return
   }
 
-  // 查找归档会话是否已在本地列表中
+ // 查找归档会话是否已在本地列表中
   let existingIndex = sessionList.findIndex(s => s.sessionId === session.sessionId)
 
   if (existingIndex !== -1) {
-    // 已存在，更新消息内容为归档数据（含完整 messages）
+ // 已存在，更新消息内容为归档数据（含完整 messages）
     sessionList[existingIndex] = { ...sessionList[existingIndex], ...session, isArchived: true }
   } else {
-    // 不在本地列表中，添加进去
+ // 不在本地列表中，添加进去
     sessionList.unshift({ ...session, isArchived: true })
   }
 
-  // 🔑 直接用 loadSession 渲染（loadSession 从 sessions 列表中读取 messages）
-  // 不再调用 fetchSessionDetailFromBackend 去查 Redis（归档数据已不在 Redis 中）
+ // 直接用 loadSession 渲染（loadSession 从 sessions 列表中读取 messages）
+ // 不再调用 fetchSessionDetailFromBackend 去查 Redis（归档数据已不在 Redis 中）
   chatStore.loadSession(session.sessionId, appKey)
 }
 
-// 🔑 企业级：刷新历史会话（从后端加载）
+// 企业级：刷新历史会话（从后端加载）
 async function refreshHistory() {
   if (guardStreamingAction('请先停止当前回复再刷新历史记录')) return
   if (chatStore.isLoadingSessions) return
@@ -406,7 +407,7 @@ async function refreshHistory() {
   await chatStore.fetchSessionsFromBackend(chatStore.currentApp)
 }
 
-// 🔑 企业级：处理会话操作命令（编辑、置顶、删除）
+// 企业级：处理会话操作命令（编辑、置顶、删除）
 function handleSessionCommand(command, session) {
   if (guardStreamingAction('请先停止当前回复再操作历史会话')) return
 
@@ -451,7 +452,7 @@ function handleEditSessionTitle(session) {
       ElMessage.success('标题已更新')
     }
   }).catch(() => {
-    // 用户取消
+ // 用户取消
   }).finally(() => {
     editingSessionId.value = null
   })
@@ -459,17 +460,17 @@ function handleEditSessionTitle(session) {
 
 // 置顶/取消置顶
 async function handlePinSession(session) {
-  // 🔑 修复：先保存当前状态，再执行切换
+ // 修复：先保存当前状态，再执行切换
   const wasPinned = session.isPinned
 
-  // 调用store方法，获取返回值（现在是异步的）
+ // 调用store方法，获取返回值（现在是异步的）
   const success = await chatStore.togglePinSession(session.sessionId, chatStore.currentApp)
 
   if (success) {
-    // 切换成功，显示对应消息
+ // 切换成功，显示对应消息
     ElMessage.success(wasPinned ? '已取消置顶' : '已置顶')
   }
-  // 失败的情况在store中已经处理了提示
+ // 失败的情况在store中已经处理了提示
 }
 
 // 归档会话
@@ -487,12 +488,12 @@ async function handleArchiveSession(session) {
 
     const success = await chatStore.archiveSession(session.sessionId, chatStore.currentApp)
     if (success) {
-      // 归档成功后，从本地列表移除该会话
+ // 归档成功后，从本地列表移除该会话
       const sessionList = chatStore.sessions[chatStore.currentApp]
       const index = sessionList.findIndex(s => s.sessionId === session.sessionId)
       if (index !== -1) {
         sessionList.splice(index, 1)
-        // 如果归档的是当前会话，切换到最新会话
+ // 如果归档的是当前会话，切换到最新会话
         if (chatStore.currentSessionId[chatStore.currentApp] === session.sessionId) {
           if (sessionList.length > 0) {
             chatStore.switchApp(chatStore.currentApp)
@@ -504,11 +505,11 @@ async function handleArchiveSession(session) {
       }
     }
   } catch (error) {
-    // 用户取消操作
+ // 用户取消操作
   }
 }
 
-// 🔑 企业级：删除会话
+// 企业级：删除会话
 async function handleDeleteSession(session) {
   try {
     await ElMessageBox.confirm(
@@ -524,7 +525,7 @@ async function handleDeleteSession(session) {
     await chatStore.deleteSession(session.sessionId, chatStore.currentApp)
     
   } catch (error) {
-    // 用户取消操作
+ // 用户取消操作
   }
 }
 
@@ -544,7 +545,7 @@ function handleDocumentClick(event) {
   }
 }
 
-// 🔑 加载版本信息
+// 加载版本信息
 async function loadVersionInfo() {
   try {
     const res = await versionApi.getVersion()
@@ -556,23 +557,23 @@ async function loadVersionInfo() {
       }
     }
   } catch (error) {
-    console.error('[Sidebar] 加载版本信息失败:', error)
+    logger.error('[Sidebar] 加载版本信息失败:', error)
   }
 }
 
-// 🔑 组件挂载时，如果已登录则自动从后端加载历史会话
+// 组件挂载时，如果已登录则自动从后端加载历史会话
 onMounted(async () => {
   document.addEventListener('click', handleDocumentClick)
 
-  // 🔑 加载版本信息
+ // 加载版本信息
   await loadVersionInfo()
 
-  // 🔑🔑🔑 关键修复：先加载后端数据，再切换应用显示
+ // 关键修复：先加载后端数据，再切换应用显示
   if (userStore.isLoggedIn) {
     await chatStore.fetchSessionsFromBackend(chatStore.currentApp)
   }
 
-  // 数据加载完成后再切换应用显示当前会话
+ // 数据加载完成后再切换应用显示当前会话
   chatStore.switchApp(chatStore.currentApp)
 })
 
@@ -600,8 +601,8 @@ function handleLoginClick() {
 
 // 处理用户信息更新
 function handleUserUpdated(updatedUserInfo) {
-  // 用户信息已在对话框中更新到 store，这里可以做一些额外的处理
-  console.log('[Sidebar] 用户信息已更新:', updatedUserInfo)
+ // 用户信息已在对话框中更新到 store，这里可以做一些额外的处理
+  logger.log('[Sidebar] 用户信息已更新:', updatedUserInfo)
 }
 
 function toggleUserMenu() {
@@ -617,18 +618,18 @@ async function handleMenuClick(key) {
 
   switch (key) {
     case 'avatar':
-      // 🔑 打开头像设置对话框
+ // 打开头像设置对话框
       showAvatarDialog.value = true
       break
 
     case 'tools':
-      // 🔑 打开工具列表对话框
+ // 打开工具列表对话框
       functionDialogType.value = 'tools'
       showFunctionDialog.value = true
       break
 
     case 'skills':
-      // 🔑 打开 Skills 列表对话框
+ // 打开 Skills 列表对话框
       functionDialogType.value = 'skills'
       showFunctionDialog.value = true
       break
@@ -638,12 +639,12 @@ async function handleMenuClick(key) {
       break
 
     case 'about':
-      // 打开用户基本信息对话框
+ // 打开用户基本信息对话框
       showUserBasicInfoDialog.value = true
       break
 
     case 'profile':
-      // 打开用户画像对话框
+ // 打开用户画像对话框
       showUserProfileDialog.value = true
       break
 
@@ -672,21 +673,21 @@ async function handleMenuClick(key) {
         try {
           await userApi.logout()
         } catch (logoutError) {
-          console.warn('[Sidebar] 后端退出登录失败，继续清理本地状态:', logoutError)
+          logger.warn('[Sidebar] 后端退出登录失败，继续清理本地状态:', logoutError)
         }
 
         userStore.logout()
 
-        // 清除所有会话数据
+ // 清除所有会话数据
         chatStore.clearAllSessions()
         ElMessage.success('已成功退出登录')
       } catch (error) {
-        // 用户取消
+ // 用户取消
       }
       break
 
     default:
-      // 未知菜单项，静默处理
+ // 未知菜单项，静默处理
   }
 }
 </script>
@@ -716,7 +717,7 @@ async function handleMenuClick(key) {
     color: #1a1a1a;
   }
 
-  // 🔑 版本标签样式
+ // 版本标签样式
   .version-tag {
     margin-left: auto;
     padding: 2px 8px;
@@ -886,7 +887,7 @@ async function handleMenuClick(key) {
   gap: 8px;
   transition: all 0.2s;
 
-  // 🔑🔑🔑 当前选中的会话（深黄色高亮）
+ // 当前选中的会话（深黄色高亮）
   &.is-active {
     background-color: #fff3cd;  // 深黄色背景
     border-left: 3px solid #ffc107;  // 深黄色边框
@@ -1027,7 +1028,7 @@ async function handleMenuClick(key) {
     font-weight: 500;
   }
 
-  // 🔑 "升级"按钮样式（参考图二）
+ // "升级"按钮样式（参考图二）
   .upgrade-btn {
     padding: 3px 10px;
     font-size: 12px;
@@ -1057,7 +1058,7 @@ async function handleMenuClick(key) {
   }
 }
 
-// 🔑 用户下拉菜单（参考图三样式）
+// 用户下拉菜单（参考图三样式）
 .user-menu {
   position: absolute;
   bottom: calc(100% + 8px);

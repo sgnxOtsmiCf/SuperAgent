@@ -1,7 +1,10 @@
 package cn.sgnxotsmicf.dao;
 
 import cn.sgnxotsmicf.common.po.ModelGroup;
+import cn.sgnxotsmicf.common.vo.ModelGroupVo;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 /**
  * @Author: lixiang
@@ -10,4 +13,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  */
 
 public interface ModelGroupMapper extends BaseMapper<ModelGroup> {
+
+    IPage<ModelGroupVo> selectModelGroupVoPage(Page<ModelGroupVo> page);
 }

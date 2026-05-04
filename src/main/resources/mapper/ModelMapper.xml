@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.sgnxotsmicf.dao.ModelMapper">
+
+    <resultMap id="ModelVoResultMap" type="cn.sgnxotsmicf.common.vo.ModelVo">
+        <id column="id" property="id"/>
+        <result column="model_code" property="modelCode"/>
+        <result column="model_name" property="modelName"/>
+        <result column="provider_id" property="providerId"/>
+        <result column="provider_name" property="providerName"/>
+        <result column="model_type" property="modelType" javaType="cn.sgnxotsmicf.common.po.ModelEnum"/>
+        <result column="capabilities" property="capabilities"/>
+        <result column="context_window" property="contextWindow"/>
+        <result column="max_output_tokens" property="maxOutputTokens"/>
+        <result column="input_price_per_1m" property="inputPricePer1M"/>
+        <result column="output_price_per_1m" property="outputPricePer1M"/>
+        <result column="currency" property="currency"/>
+        <result column="billing_unit" property="billingUnit"/>
+        <result column="param_constraints" property="paramConstraints"/>
+        <result column="is_recommended" property="isRecommended"/>
+        <result column="description" property="description"/>
+        <result column="icon_url" property="iconUrl"/>
+        <result column="tags" property="tags"/>
+    </resultMap>
+
+    <select id="selectModelVoPage" resultMap="ModelVoResultMap">
+        SELECT
+        m.id,
+        m.model_code,
+        m.model_name,
+        m.provider_id,
+        m.provider_name,
+        m.model_type,
+        m.capabilities,
+        m.context_window,
+        m.max_output_tokens,
+        m.input_price_per_1m,
+        m.output_price_per_1m,
+        m.currency,
+        m.billing_unit,
+        m.param_constraints,
+        m.is_recommended,
+        m.description,
+        m.icon_url,
+        m.tags
+        FROM superagent_model m
+        WHERE m.status = 1
+        AND m.is_deleted = 0
+        <if test="groupId != null">
+            AND EXISTS (
+            SELECT 1 FROM superagent_model_group_relation mgr
+            WHERE mgr.model_id = m.id
+            AND mgr.group_id = #{groupId}
+            AND mgr.is_deleted = 0
+            )
+        </if>
+        <if test="providerId != null">
+            AND m.provider_id = #{providerId}
+        </if>
+        <if test="modelType != null and modelType != ''">
+            AND m.model_type = #{modelType}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (m.model_name LIKE CONCAT('%', #{keyword}, '%') OR m.model_code LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY m.is_recommended DESC, m.sort_order
+    </select>
+
+    <select id="selectModelVoListByProviderId" resultMap="ModelVoResultMap">
+        SELECT m.id,
+               m.model_code,
+               m.model_name,
+               m.provider_id,
+               m.provider_name,
+               m.model_type,
+               m.capabilities,
+               m.context_window,
+               m.max_output_tokens,
+               m.input_price_per_1m,
+               m.output_price_per_1m,
+               m.currency,
+               m.billing_unit,
+               m.param_constraints,
+               m.is_recommended,
+               m.description,
+               m.icon_url,
+               m.tags
+        FROM superagent_model m
+        WHERE m.status = 1
+          AND m.is_deleted = 0
+          AND m.provider_id = #{providerId}
+        ORDER BY m.is_recommended DESC, m.sort_order
+    </select>
+
+    <select id="selectModelVoListByModelIds" resultMap="ModelVoResultMap">
+        SELECT
+        m.id,
+        m.model_code,
+        m.model_name,
+        m.provider_id,
+        m.provider_name,
+        m.model_type,
+        m.capabilities,
+        m.context_window,
+        m.max_output_tokens,
+        m.input_price_per_1m,
+        m.output_price_per_1m,
+        m.currency,
+        m.billing_unit,
+        m.param_constraints,
+        m.is_recommended,
+        m.description,
+        m.icon_url,
+        m.tags
+        FROM superagent_model m
+        WHERE m.status = 1
+        AND m.is_deleted = 0
+        AND m.id IN
+        <foreach collection="modelIds" item="modelId" open="(" separator="," close=")">
+            #{modelId}
+        </foreach>
+        ORDER BY m.is_recommended DESC, m.sort_order
+    </select>
+
+</mapper>

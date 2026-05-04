@@ -411,6 +411,9 @@ public class ServiceUtil {
      * @return ChatMessageVo 对象
      */
     public ChatMessageVo getChatMessageVoByMessage(Message message) {
+        if (message.getMessageType() == MessageType.SYSTEM) {
+            return null;
+        }
         ChatMessageVo chatMessageVo = new ChatMessageVo();
         //TODO:这里两个值spring ai alibaba redis中都没有存,用默认值代替|因为也不影响前端展示效果
         chatMessageVo.setMessageTime(LocalDateTime.now());

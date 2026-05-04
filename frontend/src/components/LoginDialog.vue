@@ -527,7 +527,7 @@ async function handleLogin() {
       }
 
       try {
-        const userRes = await userApi.getUserInfo(userId)
+        const userRes = await userApi.getUserInfo()
         if (userRes.code === 200 && userRes.data) {
           userInfo = {
             ...userInfo,
@@ -537,9 +537,8 @@ async function handleLogin() {
         }
       } catch (userError) {
         logger.warn('[LoginDialog] ⚠️ 获取用户信息失败:', userError)
- // 如果获取用户信息失败，尝试只获取头像
         try {
-          const avatarRes = await userApi.getAvatarUrl(userId)
+          const avatarRes = await userApi.getAvatarUrl()
           if (avatarRes.data) {
             userInfo.avatar = avatarRes.data
           }
@@ -698,7 +697,7 @@ async function handlePhoneLogin() {
       }
 
       try {
-        const userRes = await userApi.getUserInfo(userId)
+        const userRes = await userApi.getUserInfo()
         if (userRes.code === 200 && userRes.data) {
           userInfo = {
             ...userInfo,
@@ -708,9 +707,8 @@ async function handlePhoneLogin() {
         }
       } catch (userError) {
         logger.warn('[LoginDialog] ⚠️ 获取用户信息失败:', userError)
- // 如果获取用户信息失败，尝试只获取头像
         try {
-          const avatarRes = await userApi.getAvatarUrl(userId)
+          const avatarRes = await userApi.getAvatarUrl()
           if (avatarRes.data) {
             userInfo.avatar = avatarRes.data
           }

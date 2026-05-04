@@ -2,10 +2,21 @@ import { parseError, getFriendlyErrorMessage } from '@/utils/errorHandler'
 import { logger } from '@/utils/logger'
 import { ElMessageBox } from 'element-plus'
 
+// 全局登录弹窗锁，防止重复弹出（与 request.js 共用逻辑）
+let isLoginAlertShowing = false
+
 export async function fetchStream(apiPath, method, params, onMessage, onError, onComplete, abortController) {
- // 关键：在发送请求前检查是否已登录
-  const token = localStorage.getItem('token')
-  if (!token) {
+  const { useUserStore } = await import('@/stores/user')
+  const userStore = useUserStore()
+
+  if (!userStore.isLoggedIn || !userStore.token) {
+    // 如果弹窗已在显示，直接返回错误，不再重复弹窗
+    if (isLoginAlertShowing) {
+      onError(new Error('未登录'))
+      return
+    }
+
+    isLoginAlertShowing = true
     ElMessageBox.alert(
       '请先登录后再发送消息',
       '未登录',
@@ -13,12 +24,13 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
         confirmButtonText: '去登录',
         type: 'warning',
         callback: () => {
- // 触发自定义事件打开登录对话框
+          isLoginAlertShowing = false
           window.dispatchEvent(new CustomEvent('show-login-dialog'))
         }
       }
-    )
- // 调用onError让上层知道请求被取消了
+    ).catch(() => {
+      isLoginAlertShowing = false
+    })
     onError(new Error('未登录'))
     return
   }
@@ -45,7 +57,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
       method: method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        'Authorization': `Bearer ${userStore.token}`
       },
       signal: abortController?.signal
     }
@@ -57,6 +69,25 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
     const response = await fetch(url, options)
 
     if (!response.ok) {
+      if (response.status === 401) {
+        ElMessageBox.alert(
+          '登录已过期，请重新登录',
+          '登录过期',
+          {
+            confirmButtonText: '确定',
+            type: 'warning',
+            callback: () => {
+              userStore.logout()
+              window.location.reload()
+            }
+          }
+        )
+        const authError = new Error('登录已过期')
+        authError.status = 401
+        authError.isAuthError = true
+        throw authError
+      }
+
       let backendErrorMsg = ''
       try {
         const errorBody = await response.text()
@@ -99,7 +130,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
         return
       }
 
-      if (normalizedEventType === 'init' || (normalizedEventType === null && trimmedData.includes('"sessionId"'))) {
+      if (normalizedEventType === 'init' || (normalizedEventType === null && trimmedData.startsWith('{') && trimmedData.includes('"sessionId"'))) {
         try {
           const parsed = JSON.parse(trimmedData)
           if (parsed.sessionId) {
@@ -119,7 +150,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
       }
 
       if (normalizedEventType === 'thinking' ||
-          (normalizedEventType === null && trimmedData.includes('"thinking"'))) {
+          (normalizedEventType === null && trimmedData.startsWith('{') && trimmedData.includes('"thinking"'))) {
         try {
           const thinkingData = JSON.parse(trimmedData)
           const thinkingContent = thinkingData.thinking || thinkingData.content || data
@@ -145,7 +176,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
       }
 
       if (normalizedEventType === 'toolUsage' ||
-          (normalizedEventType === null && (trimmedData.includes('"type":"function"') || trimmedData.includes('"name":')))) {
+          (normalizedEventType === null && trimmedData.startsWith('{') && (trimmedData.includes('"type":"function"') || trimmedData.includes('"name":')))) {
         try {
           let toolData = JSON.parse(trimmedData)
 
@@ -167,7 +198,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
       }
 
       if (normalizedEventType === 'toolResponse' ||
-          (normalizedEventType === null && trimmedData.includes('"responseData"'))) {
+          (normalizedEventType === null && trimmedData.startsWith('{') && trimmedData.includes('"responseData"'))) {
         try {
           let responseData = JSON.parse(trimmedData)
 
@@ -215,7 +246,7 @@ export async function fetchStream(apiPath, method, params, onMessage, onError, o
       }
 
       if (normalizedEventType === 'message' || normalizedEventType === null) {
-        if (SYSTEM_MESSAGES.some(msg => trimmedData.includes(msg))) {
+        if (normalizedEventType === null && SYSTEM_MESSAGES.some(msg => trimmedData.includes(msg))) {
           return
         }
 

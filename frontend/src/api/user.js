@@ -53,20 +53,23 @@ export const userApi = {
   },
 
  // 关键修正：minio图片头像文件查询 - 改为getAvatarUrl（符合controller.md文档）
- // 后端：@GetMapping("/getAvatarUrl") + @RequestParam("userId")
-  getAvatarUrl(userId) {
-    return request.get('/user/getAvatarUrl', { params: { userId } })
+ // 后端：@GetMapping("/getAvatarUrl")，userId 由后端从 Token 解析
+  getAvatarUrl() {
+    return request.get('/user/getAvatarUrl')
   },
 
- // 获取用户基本信息
- // 后端：@GetMapping + @RequestParam("userId")
-  getUserInfo(userId) {
-    return request.get('/user', { params: { userId } })
+  getUserInfo() {
+    return request.get('/user')
   },
 
- // 更新用户基本信息
- // 后端：@PutMapping + @RequestBody UserVo
   updateUserInfo(userVo) {
     return request.put('/user', userVo)
+  },
+
+  // 后端：@PutMapping("/password")，userId 由后端从 Token 解析
+  updatePassword(password, newPassword) {
+    return request.put('/user/password', null, {
+      params: { password, newPassword }
+    })
   }
 }

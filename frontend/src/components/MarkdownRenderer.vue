@@ -152,12 +152,26 @@ function countNonWordUnderscores(content) {
 
 function hasTableStructure(content) {
   const lines = content.split('\n')
-  for (let i = 1; i < lines.length; i++) {
-    if (/^\s*\|?[\s:-]+\|[\s|:-]+\|?\s*$/.test(lines[i])) {
+  let pipeLineCount = 0
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) continue
+    
+    // 检查是否包含至少2个管道符
+    const pipeCount = (line.match(/\|/g) || []).length
+    if (pipeCount >= 2) {
+      pipeLineCount++
+    }
+    
+    // 检查表格分隔行（支持任意列数）
+    if (/^(\s*\|?\s*[:-]+\s*\|)+\s*$/.test(line) || /^(\s*[:-]+\s*\|)+\s*[:-]+\s*$/.test(line)) {
       return true
     }
   }
-  return false
+  
+  // 如果有至少一行是表格行格式，就认为有表格结构
+  return pipeLineCount >= 1
 }
 
 function closeOpenCodeFence(content) {
@@ -173,13 +187,14 @@ function closeOpenCodeFence(content) {
 }
 
 function detectBlockContext(content) {
-  if (!content) return { inCodeBlock: false, inBlockquote: false, inList: false, listDepth: 0 }
+  if (!content) return { inCodeBlock: false, inBlockquote: false, inList: false, listDepth: 0, inTable: false }
 
   const lines = content.split('\n')
   let inCodeBlock = false
   let inBlockquote = false
   let inList = false
   let listDepth = 0
+  let inTable = false
 
   for (const line of lines) {
     const trimmed = line.trim()
@@ -205,36 +220,51 @@ function detectBlockContext(content) {
       continue
     }
 
- // 缩进内容（列表项延续），保持当前状态
+    // 表格分隔行检测（支持任意列数）
+    // 表格分隔行特征：由管道符分隔的多个单元格，每个单元格包含至少3个-或:字符
+    // 例如：|------|------|----------| 或 |:-:|:---|---:|
+    if (/^(\s*\|?\s*[:-]+\s*\|)+\s*$/.test(trimmed) || /^(\s*[:-]+\s*\|)+\s*[:-]+\s*$/.test(trimmed)) {
+      inTable = true
+      continue
+    }
+
+    // 缩进内容（列表项延续），保持当前状态
     if (/^\s{2,}\S/.test(line)) {
       continue
     }
 
- // 非缩进非特殊行：重置引用；标题/分割线则同时重置列表
+    // 非缩进非特殊行：重置引用；标题/分割线则同时重置列表
     inBlockquote = false
-    if (/^(#{1,6}\s|[-*_]{3,}\s*$)/.test(line)) {
+    // 简化正则：只要以 1-6 个 # 开头就重置列表
+    if (/^#{1,6}/u.test(line) || /^[-*_]{3,}\s*$/.test(line)) {
       inList = false
       listDepth = 0
     }
   }
 
-  return { inCodeBlock, inBlockquote, inList, listDepth }
+  return { inCodeBlock, inBlockquote, inList, listDepth, inTable }
 }
 
 function sanitizeUnstableLine(line, blockContext) {
   if (!line) return line
 
-  const ctx = blockContext || { inCodeBlock: false, inBlockquote: false, inList: false, listDepth: 0 }
+  const ctx = blockContext || { inCodeBlock: false, inBlockquote: false, inList: false, listDepth: 0, inTable: false }
   if (ctx.inCodeBlock) return line
 
   const trimmed = line.trim()
 
- // 标题：流式过程中几乎总是不完整的，插入零宽空格阻止 marked 解析为标题
-  if (/^#{1,6}\s/.test(line)) {
-    return line.replace(/^(#{1,6})(\s)/, '$1​$2')
+  // 检测表格行：任何包含多个管道符的行都视为表格行
+  const pipeCount = (trimmed.match(/\|/g) || []).length
+  if (pipeCount >= 2 && /^\|.*\|/.test(trimmed)) {
+    return line
   }
 
- // 无序列表标记：不在列表中时用反斜杠转义
+  // 注意：不再在此处处理标题，因为：
+  // 1. 完整标题行会被 isCompleteBlockLine 检测到并移到 stablePart
+  // 2. stablePart 使用 marked.parse() 可以正确渲染标题
+  // 3. 此处插入零宽空格会破坏标题语法
+
+  // 无序列表标记：不在列表中时用反斜杠转义
   const ulMatch = line.match(/^(\s*)([-*+])(\s)/)
   if (ulMatch) {
     if (!ctx.inList) {
@@ -243,7 +273,7 @@ function sanitizeUnstableLine(line, blockContext) {
     return line
   }
 
- // 有序列表标记：不在列表中时用反斜杠转义
+  // 有序列表标记：不在列表中时用反斜杠转义
   const olMatch = line.match(/^(\s*)(\d+[.)])(\s)/)
   if (olMatch) {
     if (!ctx.inList) {
@@ -252,22 +282,23 @@ function sanitizeUnstableLine(line, blockContext) {
     return line
   }
 
- // 引用：不在引用块中时转义
+  // 引用：不在引用块中时转义
   if (/^(\s*)>\s/.test(line) && !ctx.inBlockquote) {
     return line.replace(/^(\s*)(>)(\s)/, '$1\\$2$3')
   }
 
- // 代码围栏：不稳定行中出现几乎总是意外，转义
+  // 代码围栏：不稳定行中出现几乎总是意外，转义
   if (/^[ \t]*```/.test(line) || /^[ \t]*~~~/.test(line)) {
     return line.replace(/^([ \t]*)(```+|~~~+)/, '$1\\`\\`\\`')
   }
 
- // 表格管道：转义
-  if (/^(\s*)\|/.test(line)) {
-    return line.replace(/^(\s*)(\|)/, '$1\\$2')
+  // 表格管道：仅当不是表格上下文时才转义
+  // 以 | 开头且包含管道符的行，很可能是表格
+  if (/^(\s*)\|/.test(line) && pipeCount >= 1) {
+    return line
   }
 
- // 水平分割线
+  // 水平分割线
   if (/^(-{3,}|_{3,}|\*{3,})\s*$/.test(trimmed)) {
     return line.replace(/^(\s*)([-_*]{3,})/, '$1\\$2')
   }
@@ -337,17 +368,43 @@ function preprocessIncompleteMarkdown(content, streaming = false) {
 }
 
 function applyAllMarkdownFixes(processed) {
- // 1. 修复不完整的代码块（保留缩进，避免破坏列表/引用嵌套）
-  processed = closeOpenCodeFence(processed)
+  // 0. 修复标题前有非标题内容的情况（流式输出常见）
+  // 例如：Python与Java核心区别##一、语言特性 → Python与Java核心区别\n##一、语言特性
+  // 注意：使用捕获组替代 (?<!^|\n) lookbehind，因为 JS 中 ^ 在 lookbehind 中不作为锚点
+  processed = processed.replace(/([^\n])(#{1,6})/g, '$1\n$2')
 
- // 2. 修复可能被截断的列表项（支持 - * + 和 1. 1) 样式）
-  processed = processed.replace(/^(\s*[-*+]\s*)$/gm, '$1 ')
-  processed = processed.replace(/^(\s*\d+[.)]\s*)$/gm, '$1 ')
+  // 0.5. 修复中文式标题（#后无空格），转换为标准格式
+  // 例如：##一、语言特性 → ## 一、语言特性
+  processed = processed.replace(/^(#{1,6})([^\s#])/gm, '$1 $2')
 
- // 3. 修复可能被截断的标题
-  processed = processed.replace(/^(#{1,6})$/gm, '$1 ')
+  // 0.6. 修复非标准列表格式：-X: → - X: （在 - 后插入空格）
+  // 例如：-Python: → - Python:
+  // 注意：不匹配标准的 - 空格 格式，也不匹配水平分割线 ---
+  // 修复：保留冒号后的内容
+  processed = processed.replace(/^(\s*)-([^\s\n-])/gm, '$1- $2')
 
- // 4. 修复不完整的粗体（双星号 **bold** 和双下划线 __bold__）
+  // 0.7. 修复中文序号标题：将 "一、XXX" 转换为 "## 一、XXX"
+  // 例如：二、关键差异要点 → ## 二、关键差异要点
+  // 支持：一、二、三...十、以及数字序号
+  // 注意：需要处理中文序号+分隔符+内容的格式
+  // 排除已经是列表项的行（以 - * + 数字. 开头）
+  processed = processed.replace(/^(一|二|三|四|五|六|七|八|九|十)[、.].+$/gm, (match) => {
+    if (/^\s*(?:[-*+]|\d+[.)])\s/.test(match)) return match
+    return '## ' + match
+  })
+  processed = processed.replace(/^([0-9]+)[、.].+$/gm, (match) => {
+    if (/^\s*(?:[-*+]|\d+[.)])\s/.test(match)) return match
+    return '## ' + match
+  })
+
+  // 1. 修复标题后紧跟表格的情况（流式输出常见）
+  // 例如：##标题|列1|列2| → 在标题和表格之间插入换行
+  // 例如：##标题|列1|列2| → 在标题和表格之间插入换行
+  // 注意：这里需要在标准化标题格式之后执行，所以同时处理有/无空格的情况
+  processed = processed.replace(/^(#{1,6}\s*.+?)\|(.+)$/gm, '$1\n|$2')
+
+  // 1.5 修复粗体和标题在同一行的情况
+  // 例如：## 一些文字 **粗体** → 确保粗体标记正确闭合
   const boldCount = (processed.match(/\*\*/g) || []).length
   if (boldCount % 2 !== 0) {
     processed += '**'
@@ -357,30 +414,40 @@ function applyAllMarkdownFixes(processed) {
     processed += '__'
   }
 
- // 5. 修复不完整的斜体（单星号 *italic*，排除列表标记符号）
+  // 2. 修复不完整的代码块（保留缩进，避免破坏列表/引用嵌套）
+  processed = closeOpenCodeFence(processed)
+
+  // 3. 修复可能被截断的列表项（支持 - * + 和 1. 1) 样式）
+  processed = processed.replace(/^(\s*[-*+]\s*)$/gm, '$1 ')
+  processed = processed.replace(/^(\s*\d+[.)]\s*)$/gm, '$1 ')
+
+  // 4. 修复可能被截断的标题
+  processed = processed.replace(/^(#{1,6})$/gm, '$1 ')
+
+  // 6. 修复不完整的斜体（单星号 *italic*，排除列表标记符号）
   const singleAsteriskCount = countNonListAsterisks(processed)
   if (singleAsteriskCount % 2 !== 0) {
     processed += '*'
   }
 
- // 6. 修复不完整的斜体（单下划线 _italic_，仅匹配单词边界的下划线）
+  // 7. 修复不完整的斜体（单下划线 _italic_，仅匹配单词边界的下划线）
   const singleUnderscoreCount = countNonWordUnderscores(processed)
   if (singleUnderscoreCount % 2 !== 0) {
     processed += '_'
   }
 
- // 7. 修复不完整的行内代码
+  // 8. 修复不完整的行内代码
   const backtickCount = (processed.match(/`/g) || []).length
   if (backtickCount % 2 !== 0) {
     processed += '`'
   }
 
- // 8. 修复不完整的链接 [text](url
+  // 9. 修复不完整的链接 [text](url
   if (/\[[^\]]+\]\([^)]*$/.test(processed)) {
     processed += ')'
   }
 
- // 9. 修复不完整的表格行
+  // 10. 修复不完整的表格行
   if (hasTableStructure(processed)) {
     const lines = processed.split('\n')
     let lastLineIdx = lines.length - 1
@@ -399,10 +466,10 @@ function applyAllMarkdownFixes(processed) {
     }
   }
 
- // 10. 修复不完整的引用块
+  // 11. 修复不完整的引用块
   processed = processed.replace(/^(\s*>\s*)$/gm, '$1 ')
 
- // 11. 修复可能被截断的 HTML 标签（仅白名单标签，避免误匹配比较运算符）
+  // 12. 修复可能被截断的 HTML 标签（仅白名单标签，避免误匹配比较运算符）
   processed = closeOpenHtmlTag(processed)
 
   return processed
@@ -590,27 +657,44 @@ function closeInlineFormatting(text) {
   if (!text) return text
   let result = text
 
- // 1. 闭合粗体（**）
-  const doubleAsteriskCount = (result.match(/\*\*/g) || []).length
-  if (doubleAsteriskCount % 2 !== 0) result += '**'
+  // 0. 修复标题前有非标题内容的情况（流式输出常见）
+  // 例如：Python与Java核心区别##一、语言特性 → Python与Java核心区别\n##一、语言特性
+  // 注意：不使用 (?<!^|\n) 因为 JS 中 ^ 在 lookbehind 中不被识别为锚点
+  result = result.replace(/([^\n])(#{1,6})/g, '$1\n$2')
+  
+  // 0.5. 修复中文式标题（#后无空格），转换为标准格式
+  result = result.replace(/^(#{1,6})([^\s#])/gm, '$1 $2')
 
- // 2. 闭合粗体（__）
-  const doubleUnderscoreCount = (result.match(/__/g) || []).length
-  if (doubleUnderscoreCount % 2 !== 0) result += '__'
+  // 0.6. 修复非标准列表格式：-X: → - X: （在 - 后插入空格）
+  // 例如：-Python: → - Python:
+  // 修复：保留冒号后的内容，简化正则
+  result = result.replace(/^(\s*)-([^\s\n-])/gm, '$1- $2')
 
- // 3. 闭合斜体（*），排除列表标记和已配对的情况
+  // 0.7. 修复中文序号标题：将 "一、XXX" 转换为 "## 一、XXX"
+  result = result.replace(/^(一|二|三|四|五|六|七|八|九|十)[、.].+$/gm, '## $&')
+  result = result.replace(/^([0-9]+)[、.].+$/gm, '## $&')
+
+  // 1. 检查是否有完整的粗体（**text**），不添加额外的闭合标记
+  const doubleAsteriskMatches = result.match(/\*\*/g) || []
+  if (doubleAsteriskMatches.length % 2 !== 0) result += '**'
+
+  // 2. 闭合粗体（__）
+  const doubleUnderscoreMatches = result.match(/__/g) || []
+  if (doubleUnderscoreMatches.length % 2 !== 0) result += '__'
+
+  // 3. 闭合斜体（*），排除列表标记和已配对的情况
   const singleAsteriskCount = countNonListAsterisks(result)
   if (singleAsteriskCount % 2 !== 0) result += '*'
 
- // 4. 闭合斜体（_），仅单词边界的下划线
+  // 4. 闭合斜体（_），仅单词边界的下划线
   const singleUnderscoreCount = countNonWordUnderscores(result)
   if (singleUnderscoreCount % 2 !== 0) result += '_'
 
- // 5. 闭行内代码
+  // 5. 闭行内代码
   const backtickCount = (result.match(/`/g) || []).length
   if (backtickCount % 2 !== 0) result += '`'
 
- // 6. 闭合未完成的链接/图片 [text](url 或 ![alt](url
+  // 6. 闭合未完成的链接/图片 [text](url 或 ![alt](url
   const lastParenOpen = result.lastIndexOf('](')
   if (lastParenOpen !== -1) {
     const rest = result.substring(lastParenOpen + 2)
@@ -630,26 +714,46 @@ function isCompleteBlockLine(line, stablePart) {
   const blockContext = detectBlockContext(stablePart)
   if (blockContext.inCodeBlock) return true
 
-  if (/^#{1,6}\s+.+/.test(trimmed)) return true
+  // 使用 u 标志正确处理 Unicode 字符（emoji、中文等）
+  // 简化正则：只要以 1-6 个 # 开头就视为块级元素
+  if (/^#{1,6}/u.test(trimmed)) return true
 
+  // 中文风格标题：如 一、XXX 或 二、XXX（支持一到十及数字序号）
+  if (/^(一|二|三|四|五|六|七|八|九|十|[0-9]+)[、\.]/u.test(trimmed)) return true
+
+  // 无序列表：标准格式（- 后有空格）或中文风格格式（-后直接跟文字）
   if (/^\s*[-*+]\s+.+/.test(line)) return true
+  if (/^\s*[-*+][^\s-].+/.test(line)) return true
 
+  // 有序列表：标准格式
   if (/^\s*\d+[.)]\s+.+/.test(line)) return true
 
   if (/^>+\s+.+/.test(trimmed)) return true
 
   if (/^(-{3,}|_{3,}|\*{3,})\s*$/.test(trimmed)) return true
 
-  if (/^\|?[\s:-]+\|[\s|:-]+\|?\s*$/.test(trimmed) && /[-:]/.test(trimmed)) return true
-
-  if (trimmed.includes('|')) {
-    const pipeCount = (trimmed.match(/\|/g) || []).length
-    if (hasTableStructure(stablePart) && pipeCount >= 1) return true
-    if (/^\|/.test(trimmed) && pipeCount >= 2) return true
-    if (pipeCount >= 3) return true
-  }
-
   if (blockContext.inList && /^\s{2,}\S/.test(line)) return true
+
+  // 表格行检测：必须是明确的表格结构
+  // 1. 表格分隔行（支持任意列数）
+  // 例如：|------|------|----------| 或 |:-:|:---|---:| 或 ------|------|
+  if (/^(\s*\|?\s*[:-]+\s*\|)+\s*$/.test(trimmed) || /^(\s*[:-]+\s*\|)+\s*[:-]+\s*$/.test(trimmed)) return true
+  
+  // 2. 表格内容行：至少2个管道符（不要求必须以|开头和结尾，流式输出常见）
+  const pipeCount = (trimmed.match(/\|/g) || []).length
+  if (pipeCount >= 2 && /\|.*\|/.test(trimmed)) return true
+  
+  // 3. 表格头行：包含管道符且看起来像表格头
+  if (pipeCount >= 2 && /^\|/.test(trimmed)) return true
+
+  // 普通文本行：如果包含完整的 Markdown 格式（如粗体），也视为完整行
+  // 使用 [\s\S]+ 替代 [^*]+ 以支持粗体内容中包含单个 * 的情况
+  // 使用 u 标志支持 Unicode 字符
+  const hasInlineFormatting = /\*\*[\s\S]+?\*\*/u.test(trimmed) || 
+                              /_[^_]+_/u.test(trimmed) ||
+                              /`[^`]+`/u.test(trimmed) ||
+                              /\[[^\]]+\]\([^)]+\)/u.test(trimmed)
+  if (hasInlineFormatting) return true
 
   return false
 }
@@ -666,27 +770,63 @@ function renderMarkdown(markdown, streaming = false) {
     let finalHtml
 
     if (streaming) {
- // ── 流式渲染：分离稳定行与不稳定行 ──
- // 稳定行（已有完整换行结尾）→ 全量 markdown 解析
- // 不稳定行（最后一行，可能不完整）→ 仅内联解析，避免产生块级结构
-      const lastNewlineIndex = processedContent.lastIndexOf('\n')
+      // ── 流式渲染：分离稳定行与不稳定行 ──
+      
+      // 0. 先修复标题前有非标题内容的情况（流式输出常见）
+      // 例如：Python与Java核心区别##一、语言特性 → Python与Java核心区别\n##一、语言特性
+      // 注意：不使用 (?<!^|\n) 因为 JS 中 ^ 在 lookbehind 中不被识别为锚点
+      let normalizedContent = processedContent.replace(/([^\n])(#{1,6})/g, '$1\n$2')
+      
+      // 0.5. 修复中文式标题（#后无空格），转换为标准格式
+      normalizedContent = normalizedContent.replace(/^(#{1,6})([^\s#])/gm, '$1 $2')
+
+      // 0.6. 修复非标准列表格式：-X: → - X: （在 - 后插入空格）
+      // 例如：-Python: → - Python:
+      // 修复：保留冒号后的内容，简化正则
+      normalizedContent = normalizedContent.replace(/^(\s*)-([^\s\n-])/gm, '$1- $2')
+
+      // 0.7. 修复中文序号标题：将 "一、XXX" 转换为 "## 一、XXX"
+      // 例如：二、关键差异要点 → ## 二、关键差异要点
+      normalizedContent = normalizedContent.replace(/^(一|二|三|四|五|六|七|八|九|十)[、.].+$/gm, '## $&')
+      normalizedContent = normalizedContent.replace(/^([0-9]+)[、.].+$/gm, '## $&')
+      
+      // 稳定行（已有完整换行结尾）→ 全量 markdown 解析
+      // 不稳定行（最后一行，可能不完整）→ 仅内联解析，避免产生块级结构
+      const lastNewlineIndex = normalizedContent.lastIndexOf('\n')
       let stablePart = ''
       let unstablePart = ''
 
       if (lastNewlineIndex === -1) {
- // 整段内容都在一行上，全部按内联处理
-        unstablePart = processedContent
+        // 整段内容都在一行上，但如果这是一个完整的块级行，按块级处理
+        if (isCompleteBlockLine(normalizedContent, '')) {
+          stablePart = normalizedContent + '\n'
+          unstablePart = ''
+        } else {
+          // 否则按内联处理
+          unstablePart = normalizedContent
+        }
       } else {
-        stablePart = processedContent.substring(0, lastNewlineIndex + 1)
-        unstablePart = processedContent.substring(lastNewlineIndex + 1)
+        stablePart = normalizedContent.substring(0, lastNewlineIndex + 1)
+        unstablePart = normalizedContent.substring(lastNewlineIndex + 1)
       }
 
-      if (unstablePart && isCompleteBlockLine(unstablePart, stablePart)) {
-        stablePart += unstablePart + '\n'
-        unstablePart = ''
+      // 将不稳定部分中的完整行移到稳定部分，仅保留最后一个不完整行
+      // 这样可以确保表格、列表等多行块级结构能被正确解析
+      if (unstablePart) {
+        const unstableLines = unstablePart.split('\n')
+        if (unstableLines.length > 1) {
+          const completeLines = unstableLines.slice(0, -1).join('\n') + '\n'
+          const lastLine = unstableLines[unstableLines.length - 1]
+          stablePart += completeLines
+          unstablePart = lastLine
+        } else if (isCompleteBlockLine(unstablePart, stablePart)) {
+          stablePart += unstablePart + '\n'
+          unstablePart = ''
+        }
       }
 
- // 渲染稳定部分：修复块级结构后全量解析
+      // 修复稳定部分后，重新检查是否有完整的块级行应该被移到稳定部分
+      // 这对于流式输出中刚刚完成的块级元素很重要
       let stableHtml = ''
       if (stablePart && stablePart.trim()) {
         const fixedStable = applyAllMarkdownFixes(stablePart)
@@ -698,15 +838,29 @@ function renderMarkdown(markdown, streaming = false) {
         }
       }
 
- // 渲染不稳定部分：仅内联解析（marked.parseInline 不会产生块级元素）
+      // 渲染不稳定部分：根据行类型选择解析方式（块级用 parse，内联用 parseInline）
       let unstableHtml = ''
       if (unstablePart && unstablePart.trim()) {
-        const inlineFixed = closeInlineFormatting(unstablePart)
-        try {
-          const parsed = marked.parseInline(inlineFixed, { async: false, renderer: markdownRenderer })
-          unstableHtml = typeof parsed === 'string' ? parsed : String(parsed)
-        } catch (e) {
-          unstableHtml = escapeHtml(unstablePart)
+        const isBlockLine = isCompleteBlockLine(unstablePart, stablePart)
+        
+        if (isBlockLine) {
+          // 块级行：全量解析（表格、标题等）
+          const fixedUnstable = applyAllMarkdownFixes(unstablePart)
+          try {
+            const parsed = marked.parse(fixedUnstable, { async: false, renderer: markdownRenderer })
+            unstableHtml = typeof parsed === 'string' ? parsed : String(parsed)
+          } catch (e) {
+            unstableHtml = escapeHtml(unstablePart).replace(/\n/g, '<br>')
+          }
+        } else {
+          // 内联行：仅内联解析（粗体、链接等）
+          const inlineFixed = closeInlineFormatting(unstablePart)
+          try {
+            const parsed = marked.parseInline(inlineFixed, { async: false, renderer: markdownRenderer })
+            unstableHtml = typeof parsed === 'string' ? parsed : String(parsed)
+          } catch (e) {
+            unstableHtml = escapeHtml(unstablePart)
+          }
         }
       }
 
@@ -741,9 +895,13 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
 
 <style lang="scss">
 .markdown-renderer {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   font-size: 15px;
-  line-height: 1.8;
-  color: #1a1a1a;
+  line-height: 1.6;
+  color: #1f2937;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   word-wrap: break-word;
   overflow-wrap: break-word;
 
@@ -753,10 +911,10 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
   }
 
   .katex-display {
-    margin: 20px 0;
+    margin: 12px 0;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 12px 0;
+    padding: 8px 0;
   }
 
   .latex-error {
@@ -771,8 +929,6 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
 
  // ── 标题 ──
   h1, h2, h3, h4, h5, h6 {
-    margin-top: 28px;
-    margin-bottom: 16px;
     font-weight: 700;
     line-height: 1.35;
     color: #111827;
@@ -784,6 +940,11 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
 
   h1 {
     font-size: 1.85em;
+    line-height: 1.3;
+    margin-top: 0.8em;
+    margin-bottom: 0.5em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
     padding-bottom: 12px;
     background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
     -webkit-background-clip: text;
@@ -793,13 +954,17 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
 
   h2 {
     font-size: 1.5em;
-    padding-bottom: 10px;
+    line-height: 1.35;
+    margin-top: 0.7em;
+    margin-bottom: 0.45em;
+    font-weight: 650;
+    padding-bottom: 14px;
     position: relative;
 
     &::after {
       content: '';
       position: absolute;
-      bottom: 0;
+      bottom: 4px;
       left: 0;
       width: 100%;
       height: 3px;
@@ -811,43 +976,76 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
 
   h3 {
     font-size: 1.3em;
+    line-height: 1.4;
+    margin-top: 0.6em;
+    margin-bottom: 0.4em;
+    font-weight: 600;
     color: #1e40af;
   }
 
   h4 {
     font-size: 1.15em;
+    line-height: 1.45;
+    margin-top: 0.55em;
+    margin-bottom: 0.35em;
+    font-weight: 600;
     color: #374151;
   }
 
   h5, h6 {
     font-size: 1em;
+    line-height: 1.5;
+    margin-top: 0.5em;
+    margin-bottom: 0.3em;
+    font-weight: 600;
     color: #6b7280;
   }
 
  // ── 段落 ──
   p {
     margin-top: 0;
-    margin-bottom: 16px;
+    margin-bottom: 0.6em;
+    text-align: left;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
   }
 
  // ── 列表 ──
   ul, ol {
-    margin-top: 8px;
-    margin-bottom: 16px;
-    padding-left: 28px;
+    margin-top: 0.3em;
+    margin-bottom: 0.6em;
+    padding-left: 1.5em;
   }
 
   li {
-    margin-bottom: 8px;
-    line-height: 1.75;
+    margin-bottom: 0.3em;
+    line-height: 1.6;
 
     > p {
-      margin-bottom: 6px;
+      margin-bottom: 0.4em;
+    }
+
+    ul, ol {
+      margin-top: 0.2em;
+      margin-bottom: 0.2em;
+
+      li {
+        margin-bottom: 0.2em;
+        font-size: 0.98em;
+        line-height: 1.55;
+      }
     }
   }
 
   ul {
     list-style-type: disc;
+
+    & > li::marker {
+      color: #60a5fa;
+      font-size: 0.85em;
+    }
 
     ul {
       list-style-type: circle;
@@ -861,6 +1059,11 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
   ol {
     list-style-type: decimal;
 
+    & > li::marker {
+      color: #818cf8;
+      font-weight: 500;
+    }
+
     ol {
       list-style-type: lower-alpha;
 
@@ -871,9 +1074,11 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
   }
 
   input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
     margin-right: 8px;
-    vertical-align: middle;
     accent-color: #3b82f6;
+    vertical-align: middle;
   }
 
  // ── 链接 ──
@@ -894,7 +1099,7 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
     max-width: 100%;
     height: auto;
     border-radius: 12px;
-    margin: 16px 0;
+    margin: 12px 0;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s ease;
 
@@ -907,21 +1112,22 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
   hr {
     height: 2px;
     border: none;
-    margin: 32px 0;
+    margin: 14px 0;
     background: linear-gradient(90deg, transparent, #cbd5e1, #a78bfa, #cbd5e1, transparent);
     border-radius: 1px;
   }
 
  // ── 引用块 ──
   blockquote {
-    margin: 20px 0;
-    padding: 16px 24px;
+    margin: 12px 0;
+    padding: 12px 18px;
     border-left: 4px solid;
     border-image: linear-gradient(to bottom, #3b82f6, #8b5cf6) 1;
     background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
     color: #1e3a5f;
     border-radius: 0 12px 12px 0;
     position: relative;
+    line-height: 1.6;
 
     &::before {
       content: '';
@@ -937,7 +1143,13 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
 
     p {
       margin: 0;
+      margin-bottom: 0.4em;
       position: relative;
+      color: inherit;
+    }
+
+    p:last-child {
+      margin-bottom: 0;
     }
 
     p + p {
@@ -949,7 +1161,7 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
   code:not(pre code) {
     background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
     color: #dc2626;
-    padding: 2px 8px;
+    padding: 0.15em 0.45em;
     border-radius: 6px;
     font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.88em;
@@ -960,14 +1172,14 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
 
  // ── 代码块（无 header 的简单模式） ──
   pre {
-    margin: 20px 0;
-    padding: 20px 24px;
+    margin: 12px 0;
+    padding: 16px 20px;
     background: #f6f8fa;
     border: 1px solid #e5e7eb;
-    border-radius: 12px;
+    border-radius: 14px;
     overflow-x: auto;
     position: relative;
-    line-height: 1.7;
+    line-height: 1.6;
     font-size: 13.5px;
     font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
@@ -980,12 +1192,13 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
       font-size: inherit;
       color: #24292f;
       white-space: pre;
+      line-height: inherit;
     }
   }
 
  // ── 代码块（带 header） ──
   .code-block {
-    margin: 20px 0;
+    margin: 12px 0;
     border-radius: 14px;
     overflow: hidden;
     background: #f6f8fa;
@@ -1059,14 +1272,14 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
       border-radius: 0;
       background-color: transparent;
       box-shadow: none;
-      padding: 20px 24px;
+      padding: 16px 20px;
     }
   }
 
  // ── 表格 ──
   table {
     width: 100%;
-    margin: 20px 0;
+    margin: 12px 0;
     border-collapse: separate;
     border-spacing: 0;
     border-radius: 12px;
@@ -1076,7 +1289,7 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
     font-size: 14px;
 
     th, td {
-      padding: 12px 16px;
+      padding: 12px 14px;
       border-bottom: 1px solid #f3f4f6;
       border-right: 1px solid #f3f4f6;
       text-align: left;
@@ -1108,21 +1321,35 @@ const renderedHtml = computed(() => renderMarkdown(props.markdown, props.isStrea
           background-color: #eff6ff;
         }
 
-        &:last-child td {
-          border-bottom: none;
+        &:not(:last-child) td {
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        td {
+          color: #374151;
+          line-height: 1.5;
+
+          code {
+            background: linear-gradient(135deg, #fef2f2, #fff1f2);
+            padding: 0.15em 0.4em;
+            border-radius: 5px;
+            font-size: 0.92em;
+            border: 1px solid #fecaca;
+          }
         }
       }
     }
   }
 
  // ── 文本格式 ──
-  strong {
+  strong, b {
     font-weight: 700;
     color: #111827;
   }
 
-  em {
+  em, i {
     font-style: italic;
+    color: #374151;
   }
 
   del {

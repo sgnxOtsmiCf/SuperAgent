@@ -1,7 +1,10 @@
 package cn.sgnxotsmicf.dao;
 
 import cn.sgnxotsmicf.common.po.ModelProvider;
+import cn.sgnxotsmicf.common.vo.ModelProviderVo;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 /**
  * @Author: lixiang
@@ -10,4 +13,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  */
 
 public interface ModelProviderMapper extends BaseMapper<ModelProvider> {
+
+    IPage<ModelProviderVo> selectModelProviderVoPage(Page<ModelProviderVo> page);
 }

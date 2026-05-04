@@ -363,8 +363,36 @@ function loadSession(session) {
 }
 
 function handleSelectSession(session) {
+  if (guardStreamingAction()) return
+
+  if (!session.sessionId) {
+    logger.error('[Sidebar]  sessionId为空！')
+    showHistoryDialog.value = false
+    return
+  }
+
   showHistoryDialog.value = false
-  loadSession(session)
+
+  const appKey = chatStore.currentApp
+  const sessionList = chatStore.sessions[appKey]
+
+  let existingIndex = sessionList.findIndex(s => s.sessionId === session.sessionId)
+
+  if (existingIndex !== -1) {
+    chatStore.loadSession(session.sessionId, appKey)
+  } else {
+    sessionList.unshift({
+      sessionId: session.sessionId,
+      title: session.title || session.sessionName || '历史对话',
+      messages: [],
+      createdAt: session.createdAt || session.lastActive,
+      lastActive: session.lastActive,
+      syncedWithBackend: false
+    })
+    chatStore.currentSessionId[appKey] = session.sessionId
+    chatStore.currentMessages = []
+    chatStore.fetchSessionDetailFromBackend(session.sessionId, appKey)
+  }
 }
 
 function handleSelectArchivedSession(session) {

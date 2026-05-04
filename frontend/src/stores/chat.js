@@ -125,7 +125,7 @@ export const useChatStore = defineStore('chat', () => {
 
       if (!targetSession) {
         const sortedSessions = [...sessionList].sort(
-          (a, b) => new Date(b.lastActive || b.createdAt) - new Date(a.lastActive || a.createdAt)
+            (a, b) => new Date(b.lastActive || b.createdAt) - new Date(a.lastActive || a.createdAt)
         )
         targetSession = sortedSessions[0]
         currentSessionId.value[appKey] = targetSession.sessionId
@@ -263,11 +263,13 @@ export const useChatStore = defineStore('chat', () => {
     })
 
     return [...validHistory].sort((a, b) => {
-      if (a.isTop && b.isTop) {
-        return b.isTop - a.isTop
+      const aTop = Number(a.isTop) || 0
+      const bTop = Number(b.isTop) || 0
+      if (aTop && bTop) {
+        return bTop - aTop
       }
-      if (a.isTop && !b.isTop) return -1
-      if (!a.isTop && b.isTop) return 1
+      if (aTop && !bTop) return -1
+      if (!aTop && bTop) return 1
 
       const timeA = new Date(a.lastActive || a.createdAt).getTime()
       const timeB = new Date(b.lastActive || b.createdAt).getTime()
@@ -352,6 +354,7 @@ export const useChatStore = defineStore('chat', () => {
           const toolResults = {}
 
           ;(session.content || []).forEach(msg => {
+            if (!msg) return
             if (msg.messageType === 'TOOL' && msg.content) {
               msg.content.forEach(toolResult => {
                 if (toolResult.id) {
@@ -362,6 +365,7 @@ export const useChatStore = defineStore('chat', () => {
           })
 
           ;(session.content || []).forEach((msg, index) => {
+            if (!msg) return
             if (msg.messageType === 'USER') {
               messages.push({
                 role: 'user',
@@ -379,13 +383,13 @@ export const useChatStore = defineStore('chat', () => {
               }))
 
               const toolResponses = toolCalls
-                .map(tc => toolResults[tc.id])
-                .filter(Boolean)
-                .map(tr => ({
-                  id: tr.id,
-                  name: tr.name,
-                  responseData: tr.responseData
-                }))
+                  .map(tc => toolResults[tc.id])
+                  .filter(Boolean)
+                  .map(tr => ({
+                    id: tr.id,
+                    name: tr.name,
+                    responseData: tr.responseData
+                  }))
 
               const segments = []
 
@@ -440,7 +444,7 @@ export const useChatStore = defineStore('chat', () => {
             messages: messages,
             syncedWithBackend: true,
             isPinned: !!session.isTop,
-            isTop: session.isTop
+            isTop: session.isTop ? Number(session.isTop) : null
           }
         })
 
@@ -475,6 +479,7 @@ export const useChatStore = defineStore('chat', () => {
         const toolResults = {}
 
         ;(sessionData.content || []).forEach(msg => {
+          if (!msg) return
           if (msg.messageType === 'TOOL' && msg.content) {
             msg.content.forEach(toolResult => {
               if (toolResult.id) {
@@ -485,6 +490,7 @@ export const useChatStore = defineStore('chat', () => {
         })
 
         ;(sessionData.content || []).forEach(msg => {
+          if (!msg) return
           if (msg.messageType === 'USER') {
             messages.push({
               role: 'user',
@@ -502,13 +508,13 @@ export const useChatStore = defineStore('chat', () => {
             }))
 
             const toolResponses = toolCalls
-              .map(tc => toolResults[tc.id])
-              .filter(Boolean)
-              .map(tr => ({
-                id: tr.id,
-                name: tr.name,
-                responseData: tr.responseData
-              }))
+                .map(tc => toolResults[tc.id])
+                .filter(Boolean)
+                .map(tr => ({
+                  id: tr.id,
+                  name: tr.name,
+                  responseData: tr.responseData
+                }))
 
             const segments = []
 
@@ -661,8 +667,8 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       const res = session.isPinned
-        ? await sessionApi.setUpTopSession(agentId, sessionId)
-        : await sessionApi.setTopSession(agentId, sessionId)
+          ? await sessionApi.setUpTopSession(agentId, sessionId)
+          : await sessionApi.setTopSession(agentId, sessionId)
 
       if (res.code === 200) {
         if (!session.isPinned) {
@@ -676,11 +682,13 @@ export const useChatStore = defineStore('chat', () => {
         saveToLocalStorage()
 
         sessionList.sort((a, b) => {
-          if (a.isTop && b.isTop) {
-            return b.isTop - a.isTop
+          const aTop = Number(a.isTop) || 0
+          const bTop = Number(b.isTop) || 0
+          if (aTop && bTop) {
+            return bTop - aTop
           }
-          if (a.isTop && !b.isTop) return -1
-          if (!a.isTop && b.isTop) return 1
+          if (aTop && !bTop) return -1
+          if (!aTop && bTop) return 1
           return new Date(b.lastActive) - new Date(a.lastActive)
         })
 
@@ -730,8 +738,8 @@ export const useChatStore = defineStore('chat', () => {
     const oldSessionId = currentSessionId.value[appKey]
 
     const shouldUpdate = (
-      oldSessionId === '' ||
-      (oldSessionId && oldSessionId !== backendSessionId)
+        oldSessionId === '' ||
+        (oldSessionId && oldSessionId !== backendSessionId)
     )
 
     if (shouldUpdate) {
@@ -743,7 +751,7 @@ export const useChatStore = defineStore('chat', () => {
         const emptySessions = sessionList.filter(s => !s.sessionId)
         if (emptySessions.length > 0) {
           const sortedByTime = [...emptySessions].sort(
-            (a, b) => new Date(b.lastActive || b.createdAt) - new Date(a.lastActive || a.createdAt)
+              (a, b) => new Date(b.lastActive || b.createdAt) - new Date(a.lastActive || a.createdAt)
           )
           sessionIndex = sessionList.findIndex(s => s === sortedByTime[0])
         }
@@ -768,9 +776,9 @@ export const useChatStore = defineStore('chat', () => {
     const localSessions = sessions.value[appKey] || []
     const backendSessionIds = new Set(backendList.map(session => session.sessionId))
     const localSessionMap = new Map(
-      localSessions
-        .filter(session => session.sessionId)
-        .map(session => [session.sessionId, session])
+        localSessions
+            .filter(session => session.sessionId)
+            .map(session => [session.sessionId, session])
     )
 
     const mergedBackendSessions = backendList.map(session => {
@@ -780,6 +788,7 @@ export const useChatStore = defineStore('chat', () => {
         ...session,
         attachments: localSession?.attachments || session.attachments || [],
         isPinned: localSession?.isPinned ?? session.isPinned ?? false,
+        isTop: localSession?.isTop ?? session.isTop,
         lastAccessed: localSession?.lastAccessed ?? session.lastAccessed
       }
     })
@@ -860,6 +869,7 @@ export const useChatStore = defineStore('chat', () => {
           }
 
           contentArray.forEach(msg => {
+            if (!msg) return
             if (msg.messageType === 'TOOL' && msg.content) {
               const toolContentArray = Array.isArray(msg.content) ? msg.content : []
               toolContentArray.forEach(toolResult => {
@@ -869,6 +879,7 @@ export const useChatStore = defineStore('chat', () => {
           })
 
           contentArray.forEach(msg => {
+            if (!msg) return
             if (msg.messageType === 'USER') {
               messages.push({
                 role: 'user',
@@ -881,8 +892,8 @@ export const useChatStore = defineStore('chat', () => {
               const toolCalls = msg.metadata?.toolCalls || []
               const toolUsages = toolCalls.map(tc => ({ id: tc.id, name: tc.name, arguments: tc.arguments }))
               const toolResponses = toolCalls
-                .map(tc => toolResults[tc.id]).filter(Boolean)
-                .map(tr => ({ id: tr.id, name: tr.name, responseData: tr.responseData }))
+                  .map(tc => toolResults[tc.id]).filter(Boolean)
+                  .map(tr => ({ id: tr.id, name: tr.name, responseData: tr.responseData }))
 
               const segments = []
               toolUsages.forEach(tool => segments.push({ type: 'toolUsage', data: tool, timestamp: new Date(msg.messageTime).getTime() }))
@@ -954,7 +965,7 @@ export const useChatStore = defineStore('chat', () => {
     Object.keys(sessions.value).forEach(appKey => {
       const sessionList = sessions.value[appKey]
       const sorted = [...sessionList].sort(
-        (a, b) => new Date(b.lastActive || b.createdAt) - new Date(a.lastActive || a.createdAt)
+          (a, b) => new Date(b.lastActive || b.createdAt) - new Date(a.lastActive || a.createdAt)
       )
 
       sorted.forEach((session, index) => {

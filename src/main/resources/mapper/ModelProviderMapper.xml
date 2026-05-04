@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.sgnxotsmicf.dao.ModelProviderMapper">
+
+    <resultMap id="ModelProviderVoResultMap" type="cn.sgnxotsmicf.common.vo.ModelProviderVo">
+        <id column="id" property="id"/>
+        <result column="provider_code" property="providerCode"/>
+        <result column="provider_name" property="providerName"/>
+        <result column="provider_type" property="providerType" javaType="cn.sgnxotsmicf.common.po.ProviderEnum"/>
+        <result column="base_url" property="baseUrl"/>
+        <result column="api_version" property="apiVersion"/>
+        <result column="auth_type" property="authType" javaType="cn.sgnxotsmicf.common.po.AuthEnum"/>
+        <result column="timeout_ms" property="timeoutMS"/>
+        <result column="max_retries" property="maxRetries"/>
+        <result column="rate_limit_qps" property="rateLimitQps"/>
+        <result column="config_json" property="configJson"/>
+        <collection property="modelVoList" ofType="cn.sgnxotsmicf.common.vo.ModelVo"
+                    column="{providerId=id}" select="cn.sgnxotsmicf.dao.ModelMapper.selectModelVoListByProviderId"/>
+    </resultMap>
+
+    <select id="selectModelProviderVoPage" resultMap="ModelProviderVoResultMap">
+        SELECT id,
+               provider_code,
+               provider_name,
+               provider_type,
+               base_url,
+               api_version,
+               auth_type,
+               timeout_ms,
+               max_retries,
+               rate_limit_qps,
+               config_json
+        FROM superagent_model_provider
+        WHERE status = 1
+          AND is_deleted = 0
+        ORDER BY priority
+    </select>
+
+</mapper>

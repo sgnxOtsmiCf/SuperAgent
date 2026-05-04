@@ -150,7 +150,7 @@ async function loadUserProfile() {
 
   loading.value = true
   try {
-    const res = await userProfileApi.getUserProfile(userStore.userInfo.userId)
+    const res = await userProfileApi.getUserProfile()
     if (res.code === 200 && res.data) {
       dimensions.value = groupByKey(res.data.profiles || [])
     } else {
@@ -216,7 +216,7 @@ async function saveNewDimension() {
 
   savingNew.value = true
   try {
-    const res = await userProfileApi.updateUserProfile(userStore.userInfo.userId, name, values)
+    const res = await userProfileApi.updateUserProfile(name, values)
     if (res.code === 200) {
       ElMessage.success('添加成功')
       editingNew.value = false
@@ -255,7 +255,7 @@ async function saveEditDimension(dim) {
 
   dim.saving = true
   try {
-    const res = await userProfileApi.updateUserProfile(userStore.userInfo.userId, dim.key, values)
+    const res = await userProfileApi.updateUserProfile(dim.key, values)
     if (res.code === 200) {
       ElMessage.success('更新成功')
       dim.editing = false
@@ -273,7 +273,7 @@ async function saveEditDimension(dim) {
 async function handleDeleteDimension(dim) {
   dim.deleting = true
   try {
-    const res = await userProfileApi.deleteUserProfile(userStore.userInfo.userId, dim.key)
+    const res = await userProfileApi.deleteUserProfile(dim.key)
     if (res.code === 200) {
       ElMessage.success(`已删除维度"${dim.key}"`)
       await loadUserProfile()
@@ -288,7 +288,7 @@ async function handleDeleteDimension(dim) {
 // ---- 删除单个条目 ----
 async function handleDeleteEntry(dim, entry) {
   try {
-    const res = await userProfileApi.deleteUserProfile(userStore.userInfo.userId, dim.key, entry.value)
+    const res = await userProfileApi.deleteUserProfile(dim.key, entry.value)
     if (res.code === 200) {
       ElMessage.success(`已删除"${entry.value}"`)
       await loadUserProfile()

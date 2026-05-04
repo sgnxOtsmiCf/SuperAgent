@@ -4,6 +4,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { isSystemError, isSessionError, isAuthError, getFriendlyErrorMessage } from './errorHandler'
 
+// 全局登录弹窗锁，防止重复弹出
+let isLoginAlertShowing = false
+
 // 后端 ResultCodeEnum 错误码映射
 const ERROR_CODE_MAP = {
   200: { type: 'success', message: '成功' },
@@ -17,6 +20,7 @@ const ERROR_CODE_MAP = {
   301: { type: 'error', message: '签名已过期', needLogout: true },
   208: { type: 'warning', message: '未登录，请先登录', needLogout: true },
   209: { type: 'error', message: '没有权限访问' },
+  4: { type: 'warning', message: '请求参数异常' },
   214: { type: 'warning', message: '用户名不正确' },
   215: { type: 'warning', message: '密码/验证码不正确' },
   216: { type: 'warning', message: '用户名已存在' },
@@ -38,7 +42,8 @@ const ERROR_CODE_MAP = {
   505: { type: 'error', message: '存储桶查询失败' },
   506: { type: 'error', message: '存储桶创建失败' },
   1001: { type: 'error', message: 'Agent执行异常' },
-  1002: { type: 'error', message: '模型网络连接不稳定' }
+  1002: { type: 'error', message: '模型网络连接不稳定' },
+  1003: { type: 'warning', message: '模型配置不存在' }
 }
 
 // 新增：需要登出的错误码列表（sa-token 登录过期相关）
@@ -67,13 +72,17 @@ request.interceptors.request.use(
 
 // 新增：处理登录过期，自动登出
 function handleTokenExpired(message, code) {
+  // 如果弹窗已在显示，直接返回，避免重复弹出
+  if (isLoginAlertShowing) return
+
   const userStore = useUserStore()
 
- // 关键修复：无论是否已登录，都要显示提示
- // 如果是208（未登录）且用户已登录，说明登录状态过期，执行登出
- // 如果是208（未登录）且用户未登录，提示用户先登录
+  // 关键修复：无论是否已登录，都要显示提示
+  // 如果是208（未登录）且用户已登录，说明登录状态过期，执行登出
+  // 如果是208（未登录）且用户未登录，提示用户先登录
   if (code === 208 && !userStore.isLoggedIn) {
- // 用户未登录，提示登录
+    // 用户未登录，提示登录
+    isLoginAlertShowing = true
     ElMessageBox.alert(
       message || '请先登录',
       '未登录',
@@ -81,13 +90,17 @@ function handleTokenExpired(message, code) {
         confirmButtonText: '去登录',
         type: 'warning',
         callback: () => {
- // 触发自定义事件打开登录对话框
+          isLoginAlertShowing = false
+          // 触发自定义事件打开登录对话框
           window.dispatchEvent(new CustomEvent('show-login-dialog'))
         }
       }
-    )
+    ).catch(() => {
+      isLoginAlertShowing = false
+    })
   } else {
- // 用户已登录但token过期，执行登出
+    // 用户已登录但token过期，执行登出
+    isLoginAlertShowing = true
     ElMessageBox.alert(
       message || '登录已过期，请重新登录',
       '登录过期',
@@ -95,13 +108,16 @@ function handleTokenExpired(message, code) {
         confirmButtonText: '确定',
         type: 'warning',
         callback: () => {
- // 执行登出
+          isLoginAlertShowing = false
+          // 执行登出
           userStore.logout()
- // 刷新页面或跳转到登录页（根据你的路由配置）
+          // 刷新页面或跳转到登录页（根据你的路由配置）
           window.location.reload()
         }
       }
-    )
+    ).catch(() => {
+      isLoginAlertShowing = false
+    })
   }
 }
 

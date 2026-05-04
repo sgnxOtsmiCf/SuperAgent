@@ -11,7 +11,7 @@
           <ArrowRight />
         </el-icon>
       </div>
-      <div v-show="expandedSections.thinking" class="thinking-content">
+      <div v-show="expandedSections.thinking" class="thinking-content" ref="thinkingContent">
         {{ metadata.thinking }}
       </div>
     </div>
@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { reactive, computed } from 'vue'
+import { reactive, computed, ref, watch, nextTick } from 'vue'
 import { MagicStick, Setting, CircleCheckFilled, ArrowRight } from '@element-plus/icons-vue'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 
@@ -90,6 +90,7 @@ const props = defineProps({
 })
 
 const expandedSections = reactive({})
+const thinkingContent = ref(null)
 
 const toolUsages = computed(() => props.metadata?.toolUsages || [])
 const toolResponses = computed(() => props.metadata?.toolResponses || [])
@@ -136,18 +137,47 @@ function formatResponseData(data) {
   }
   return String(data)
 }
+
+// 流式输出时自动展开思考卡片并滚动到底部
+watch(() => props.metadata?.thinking, async (newVal) => {
+  if (props.isStreaming && newVal && !expandedSections.thinking) {
+    // 流式输出时自动展开思考卡片
+    expandedSections.thinking = true
+    
+    // 等待 DOM 更新后滚动到底部
+    await nextTick()
+    if (thinkingContent.value) {
+      thinkingContent.value.scrollTop = thinkingContent.value.scrollHeight
+    }
+  }
+})
+
+// 思考内容更新时滚动到底部
+watch(() => props.metadata?.thinking, async () => {
+  if (props.isStreaming && expandedSections.thinking) {
+    await nextTick()
+    if (thinkingContent.value) {
+      thinkingContent.value.scrollTop = thinkingContent.value.scrollHeight
+    }
+  }
+})
 </script>
 
 <style lang="scss" scoped>
 .agent-message-renderer {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 
   .thinking-section {
+    width: 100%;
+    max-width: 100%;
     margin-bottom: 12px;
     border-left: 3px solid #0ea5e9;
     border-radius: 6px;
     background: #f0f9ff;
     overflow: hidden;
+    box-sizing: border-box;
 
     .thinking-header {
       display: flex;
@@ -157,6 +187,9 @@ function formatResponseData(data) {
       cursor: pointer;
       user-select: none;
       transition: background 0.2s;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
 
       &:hover {
         background: rgba(14, 165, 233, 0.08);
@@ -177,6 +210,9 @@ function formatResponseData(data) {
         font-size: 13px;
         font-weight: 500;
         color: #0369a1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .expand-icon {
@@ -199,6 +235,9 @@ function formatResponseData(data) {
       word-break: break-word;
       max-height: 160px;
       overflow-y: auto;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
 
       &::-webkit-scrollbar {
         width: 3px;
@@ -212,15 +251,21 @@ function formatResponseData(data) {
   }
 
   .tools-section {
+    width: 100%;
+    max-width: 100%;
     margin-bottom: 12px;
+    box-sizing: border-box;
   }
 
   .tool-usage-card {
+    width: 100%;
+    max-width: 100%;
     border-left: 3px solid #f59e0b;
     border-radius: 6px;
     background: #fffbeb;
     overflow: hidden;
     margin-bottom: 8px;
+    box-sizing: border-box;
 
     .tool-header {
       display: flex;
@@ -230,6 +275,9 @@ function formatResponseData(data) {
       cursor: pointer;
       user-select: none;
       transition: background 0.2s;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
 
       &:hover {
         background: rgba(245, 158, 11, 0.08);
@@ -305,15 +353,21 @@ function formatResponseData(data) {
   }
 
   .tools-response-section {
+    width: 100%;
+    max-width: 100%;
     margin-bottom: 12px;
+    box-sizing: border-box;
   }
 
   .tool-response-card {
+    width: 100%;
+    max-width: 100%;
     border-left: 3px solid #059669;
     border-radius: 6px;
     background: #ecfdf5;
     overflow: hidden;
     margin-bottom: 8px;
+    box-sizing: border-box;
 
     .response-header {
       display: flex;
@@ -323,6 +377,9 @@ function formatResponseData(data) {
       cursor: pointer;
       user-select: none;
       transition: background 0.2s;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
 
       &:hover {
         background: rgba(5, 150, 105, 0.08);
@@ -390,6 +447,15 @@ function formatResponseData(data) {
 
   .markdown-content {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+
+    :deep(.markdown-renderer) {
+      width: 100% !important;
+      max-width: 100% !important;
+      padding: 0;
+    }
   }
 
   .empty-state {

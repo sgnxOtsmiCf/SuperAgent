@@ -87,7 +87,31 @@
       </el-dropdown>
     </div>
 
-    <div class="chat-messages" ref="messagesContainer">
+    <div class="chat-messages" ref="messagesContainer" @scroll="handleMessagesScroll">
+      <!-- 浮动导航箭头：跳转到上一条/下一条用户消息 -->
+      <transition name="fade-arrow">
+        <div v-show="showScrollArrows" class="scroll-nav-arrows">
+          <button
+            class="scroll-nav-btn scroll-up"
+            :class="{ 'is-hidden': prevUserMessageIndex === -1 }"
+            :disabled="prevUserMessageIndex === -1"
+            @click="scrollToUserMessage(prevUserMessageIndex)"
+            title="上一条用户消息"
+          >
+            <el-icon><ArrowUp /></el-icon>
+          </button>
+          <button
+            class="scroll-nav-btn scroll-down"
+            :class="{ 'is-hidden': nextUserMessageIndex === -1 }"
+            :disabled="nextUserMessageIndex === -1"
+            @click="scrollToUserMessage(nextUserMessageIndex)"
+            title="下一条用户消息"
+          >
+            <el-icon><ArrowDown /></el-icon>
+          </button>
+        </div>
+      </transition>
+
       <div v-if="currentMessages.length === 0" class="empty-state">
         <el-icon :size="64" color="#d0d0d0">
           <component :is="currentAppIcon" />
@@ -99,6 +123,7 @@
       <div
           v-for="(message, index) in currentMessages"
           :key="index"
+          :data-index="index"
           class="message-wrapper"
           :class="[message.role, { 'is-hovered': hoveredMessageIndex === index, 'no-animation': !shouldAnimateMessage(index) }]"
           @mouseenter="hoveredMessageIndex = index"
@@ -222,7 +247,7 @@ import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chat'
 import { fetchStream } from '@/api/stream'
-import { Promotion, VideoPause, ArrowDown, ChatDotRound, Folder, Cpu, MagicStick, Lightning, CircleCheck, Setting } from '@element-plus/icons-vue'
+import { Promotion, VideoPause, ArrowDown, ArrowUp, ChatDotRound, Folder, Cpu, MagicStick, Lightning, CircleCheck, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { parseError, isSystemError, isSessionError } from '@/utils/errorHandler'
 import AgentMessageRenderer from './AgentMessageRenderer.vue'
@@ -237,6 +262,109 @@ const isLoading = ref(false)
 const messagesContainer = ref(null)
 const hoveredMessageIndex = ref(null)
 let lastMessageCount = 0
+
+// 浮动导航箭头相关
+const showScrollArrows = ref(false)
+const prevUserMessageIndex = ref(-1)
+const nextUserMessageIndex = ref(-1)
+let scrollArrowTimer = null
+let rafPending = false
+
+function computeScrollArrowState() {
+  if (!messagesContainer.value || currentMessages.value.length === 0) {
+    prevUserMessageIndex.value = -1
+    nextUserMessageIndex.value = -1
+    showScrollArrows.value = false
+    return
+  }
+
+  const container = messagesContainer.value
+  const scrollTop = container.scrollTop
+  const clientHeight = container.clientHeight
+  const containerRect = container.getBoundingClientRect()
+
+  // 使用容器内容坐标系（滚动期间稳定不变）
+  const viewportCenterInContent = scrollTop + clientHeight / 2
+
+  const userPositions = []
+  const wrappers = container.querySelectorAll('.message-wrapper.user')
+  wrappers.forEach((el) => {
+    const indexAttr = el.getAttribute('data-index')
+    if (indexAttr !== null) {
+      const rect = el.getBoundingClientRect()
+      // 元素在容器内容中的绝对位置（不受滚动影响）
+      const topInContent = rect.top - containerRect.top + scrollTop
+      const bottomInContent = rect.bottom - containerRect.top + scrollTop
+      userPositions.push({
+        index: parseInt(indexAttr, 10),
+        top: topInContent,
+        bottom: bottomInContent
+      })
+    }
+  })
+
+  if (userPositions.length === 0) {
+    prevUserMessageIndex.value = -1
+    nextUserMessageIndex.value = -1
+    showScrollArrows.value = false
+    return
+  }
+
+  // 找到视口中心上方最近的用户消息
+  let prevIdx = -1
+  for (let i = userPositions.length - 1; i >= 0; i--) {
+    if (userPositions[i].bottom < viewportCenterInContent - 20) {
+      prevIdx = userPositions[i].index
+      break
+    }
+  }
+
+  // 找到视口中心下方最近的用户消息
+  let nextIdx = -1
+  for (let i = 0; i < userPositions.length; i++) {
+    if (userPositions[i].top > viewportCenterInContent + 20) {
+      nextIdx = userPositions[i].index
+      break
+    }
+  }
+
+  prevUserMessageIndex.value = prevIdx
+  nextUserMessageIndex.value = nextIdx
+
+  const hasScrollableContent = container.scrollHeight > clientHeight + 100
+  const hasNavTarget = prevIdx !== -1 || nextIdx !== -1
+  showScrollArrows.value = hasScrollableContent && hasNavTarget
+}
+
+function handleMessagesScroll() {
+  // 用 rAF 节流，避免平滑滚动期间过度计算
+  if (!rafPending) {
+    rafPending = true
+    requestAnimationFrame(() => {
+      rafPending = false
+      computeScrollArrowState()
+    })
+  }
+
+  if (scrollArrowTimer) clearTimeout(scrollArrowTimer)
+  scrollArrowTimer = setTimeout(() => {
+    showScrollArrows.value = false
+  }, 2500)
+}
+
+function scrollToUserMessage(index) {
+  const container = messagesContainer.value
+  if (!container) return
+  const target = container.querySelector(`.message-wrapper.user[data-index="${index}"]`)
+  if (!target) return
+
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+  if (scrollArrowTimer) clearTimeout(scrollArrowTimer)
+  scrollArrowTimer = setTimeout(() => {
+    showScrollArrows.value = false
+  }, 3000)
+}
 
 function shouldAnimateMessage(index) {
   return index >= lastMessageCount - 1
@@ -446,6 +574,9 @@ onUnmounted(() => {
     abortController.value = null
   }
   chatStore.setStreamingResponse(false)
+  if (scrollArrowTimer) {
+    clearTimeout(scrollArrowTimer)
+  }
 })
 
 function scrollToBottom() {
@@ -633,6 +764,16 @@ async function handleSend() {
         handleError(error)
       },
       () => {
+        if (contentUpdateTimer) {
+          clearTimeout(contentUpdateTimer)
+          contentUpdateTimer = null
+          pendingContentUpdate = false
+        }
+        if (metadataUpdateTimer) {
+          clearTimeout(metadataUpdateTimer)
+          metadataUpdateTimer = null
+          pendingMetadataUpdate = false
+        }
         finalizeAssistantMessage(assistantMessageIndex)
         isLoading.value = false
         abortController.value = null
@@ -660,10 +801,6 @@ function handleStreamData(data, messageIndex) {
   }
 
   if (data.isError || data.type === 'error') {
-    isLoading.value = false
-    abortController.value = null
-    chatStore.setStreamingResponse(false)
-
  // 清除所有待处理的更新
     pendingContentUpdate = false
     pendingMetadataUpdate = false
@@ -692,6 +829,11 @@ function handleStreamData(data, messageIndex) {
       persist: true,
       forceIdle: true
     })
+
+    abortController.value?.abort()
+    abortController.value = null
+    isLoading.value = false
+    chatStore.setStreamingResponse(false)
 
     ElMessage.error(streamErrorMessage)
     return
@@ -756,18 +898,17 @@ function scheduleMetadataUpdate(messageIndex) {
   metadataUpdateTimer = setTimeout(() => {
     pendingMetadataUpdate = false
     metadataUpdateTimer = null
-    replaceAssistantMessage(messageIndex)
+    if (replaceAssistantMessage(messageIndex)) {
+      requestAnimationFrame(() => {
+        scrollToBottom()
+      })
+    }
   }, METADATA_UPDATE_INTERVAL)
 }
 
-function updateAssistantMessageWithMetadata(messageIndex) {
-  scheduleMetadataUpdate(messageIndex)
-}
-
 function handleError(error) {
-  if (abortController.value) {
-    abortController.value = null
-  }
+  abortController.value?.abort()
+  abortController.value = null
 
   isLoading.value = false
   chatStore.setStreamingResponse(false)
@@ -1033,8 +1174,8 @@ function handleError(error) {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      align-items: flex-start;
-      max-width: 80%;
+      align-items: stretch;
+      max-width: 90%;
 
       .ai-avatar-wrapper {
         flex-shrink: 0;
@@ -1048,8 +1189,9 @@ function handleError(error) {
       }
 
       .message-content {
-        flex: 1;
+        flex: 1 1 100%;
         min-width: 0;
+        max-width: 100%;
         background-color: transparent;
         border-radius: 0;
         box-shadow: none;
@@ -1057,314 +1199,7 @@ function handleError(error) {
 
         .markdown-wrapper {
           width: 100%;
-
-          :deep(.markdown-renderer) {
-            font-size: 15px;
-            line-height: 1.9;
-            color: #1f2937;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-
-            h1 {
-              font-size: 1.95em;
-              line-height: 1.3;
-              margin-top: 1.6em;
-              margin-bottom: 0.8em;
-              font-weight: 700;
-              letter-spacing: -0.025em;
-            }
-
-            h2 {
-              font-size: 1.55em;
-              line-height: 1.35;
-              margin-top: 1.5em;
-              margin-bottom: 0.75em;
-              font-weight: 650;
-            }
-
-            h3 {
-              font-size: 1.3em;
-              line-height: 1.4;
-              margin-top: 1.35em;
-              margin-bottom: 0.65em;
-              font-weight: 600;
-            }
-
-            h4 {
-              font-size: 1.15em;
-              line-height: 1.45;
-              margin-top: 1.2em;
-              margin-bottom: 0.6em;
-              font-weight: 600;
-            }
-
-            h5, h6 {
-              font-size: 1em;
-              line-height: 1.5;
-              margin-top: 1.1em;
-              margin-bottom: 0.55em;
-              font-weight: 600;
-              color: #6b7280;
-            }
-
-            p {
-              margin-bottom: 1.4em;
-              text-align: left;
-
-              &:last-child {
-                margin-bottom: 0;
-              }
-            }
-
-            ul, ol {
-              margin-top: 0.8em;
-              margin-bottom: 1.3em;
-              padding-left: 1.75em;
-
-              li {
-                margin-bottom: 0.7em;
-                line-height: 1.85;
-
-                ul, ol {
-                  margin-top: 0.4em;
-                  margin-bottom: 0.4em;
-
-                  li {
-                    margin-bottom: 0.35em;
-                    font-size: 0.98em;
-                    line-height: 1.8;
-                  }
-                }
-              }
-            }
-
-            ul {
-              list-style-type: disc;
-
-              & > li::marker {
-                color: #60a5fa;
-                font-size: 0.85em;
-              }
-            }
-
-            ol {
-              list-style-type: decimal;
-
-              & > li::marker {
-                color: #818cf8;
-                font-weight: 500;
-              }
-            }
-
-            strong, b {
-              font-weight: 700;
-              color: #111827;
-            }
-
-            em, i {
-              font-style: italic;
-              color: #374151;
-            }
-
-            code:not(pre code) {
-              background: linear-gradient(135deg, #fef2f2, #fff1f2);
-              color: #dc2626;
-              padding: 0.15em 0.45em;
-              border-radius: 6px;
-              font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
-              font-size: 0.88em;
-              border: 1px solid #fecaca;
-              font-weight: 500;
-            }
-
-            pre {
-              background: #f6f8fa;
-              color: #24292f;
-              border-radius: 14px;
-              padding: 22px 26px;
-              margin: 22px 0;
-              overflow-x: auto;
-              line-height: 1.7;
-              font-size: 13.5px;
-              font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', monospace;
-              border: 1px solid #e5e7eb;
-              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-
-              code {
-                background-color: transparent;
-                color: inherit;
-                padding: 0;
-                border-radius: 0;
-                border: none;
-                font-size: inherit;
-                line-height: inherit;
-              }
-            }
-
-            .code-block {
-              border-radius: 14px;
-              border: 1px solid #e5e7eb;
-              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-
-              &:hover {
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-              }
-
-              .code-block-header {
-                background: linear-gradient(180deg, #ffffff, #f6f8fa);
-                border-bottom: 1px solid #e5e7eb;
-                padding: 10px 18px;
-              }
-
-              .code-block-language {
-                color: #0969da;
-                background: rgba(9, 105, 218, 0.08);
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-size: 12px;
-              }
-
-              .code-copy-button {
-                border: 1px solid #d0d7de;
-                background: rgba(255, 255, 255, 0.8);
-                color: #656d76;
-                border-radius: 8px;
-                padding: 5px 14px;
-
-                &:hover {
-                  border-color: #0969da;
-                  color: #0969da;
-                  background: rgba(9, 105, 218, 0.08);
-                }
-
-                &.is-copied {
-                  color: #1a7f37;
-                  border-color: #2da44e;
-                  background: rgba(31, 136, 61, 0.08);
-                }
-              }
-
-              pre {
-                margin: 0;
-                border: none;
-                border-radius: 0;
-                background-color: transparent;
-                box-shadow: none;
-                padding: 20px 24px;
-              }
-            }
-
-            blockquote {
-              border-left: 4px solid;
-              border-image: linear-gradient(to bottom, #3b82f6, #8b5cf6) 1;
-              background: linear-gradient(135deg, #eff6ff, #f5f3ff);
-              padding: 18px 24px;
-              margin: 22px 0;
-              border-radius: 0 12px 12px 0;
-              color: #1e3a5f;
-              line-height: 1.85;
-
-              p {
-                margin-bottom: 0.6em;
-                color: inherit;
-              }
-
-              p:last-child {
-                margin-bottom: 0;
-              }
-            }
-
-            table {
-              width: 100%;
-              border-collapse: separate;
-              border-spacing: 0;
-              margin: 22px 0;
-              font-size: 14px;
-              border-radius: 12px;
-              overflow: hidden;
-              border: 1px solid #e5e7eb;
-              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-
-              thead {
-                th {
-                  padding: 14px 16px;
-                  text-align: left;
-                  font-weight: 600;
-                  color: #1e293b;
-                  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
-                  border-bottom: 2px solid #e2e8f0;
-                  white-space: nowrap;
-                }
-              }
-
-              tbody {
-                tr {
-                  transition: background-color 0.15s ease;
-
-                  &:nth-child(even) {
-                    background-color: #f9fafb;
-                  }
-
-                  &:hover {
-                    background-color: #eff6ff;
-                  }
-
-                  &:not(:last-child) td {
-                    border-bottom: 1px solid #f3f4f6;
-                  }
-
-                  td {
-                    padding: 13px 16px;
-                    color: #374151;
-                    line-height: 1.6;
-
-                    code {
-                      background: linear-gradient(135deg, #fef2f2, #fff1f2);
-                      padding: 0.15em 0.4em;
-                      border-radius: 5px;
-                      font-size: 0.92em;
-                      border: 1px solid #fecaca;
-                    }
-                  }
-                }
-              }
-            }
-
-            hr {
-              border: none;
-              height: 2px;
-              background: linear-gradient(90deg, transparent, #cbd5e1, #a78bfa, #cbd5e1, transparent);
-              margin: 32px 0;
-              border-radius: 1px;
-            }
-
-            a {
-              color: #2563eb;
-              text-decoration: none;
-              background: linear-gradient(transparent 70%, rgba(59, 130, 246, 0.15) 70%);
-              transition: all 0.2s ease;
-
-              &:hover {
-                color: #1d4ed8;
-                background: linear-gradient(transparent 60%, rgba(59, 130, 246, 0.25) 60%);
-              }
-            }
-
-            img {
-              max-width: 100%;
-              height: auto;
-              border-radius: 12px;
-              margin: 16px 0;
-              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-            }
-
-            input[type="checkbox"] {
-              width: 16px;
-              height: 16px;
-              margin-right: 8px;
-              accent-color: #3b82f6;
-              vertical-align: middle;
-            }
-          }
+          max-width: 100%;
         }
       }
 
@@ -1502,6 +1337,71 @@ function handleError(error) {
   40% {
     transform: scale(1);
   }
+}
+
+// 浮动导航箭头样式
+.scroll-nav-arrows {
+  position: fixed;
+  right: 28px;
+  bottom: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 100;
+  pointer-events: none;
+
+  .scroll-nav-btn {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    color: #4b5563;
+    transition: opacity 0.25s ease, background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    font-size: 16px;
+    cursor: pointer;
+    outline: none;
+
+    &.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: none;
+    }
+
+    &:hover:not(.is-hidden):not(:disabled) {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+      color: #111827;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+    }
+
+    &:active:not(.is-hidden):not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .el-icon {
+      font-size: 16px;
+    }
+  }
+}
+
+.fade-arrow-enter-active,
+.fade-arrow-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-arrow-enter-from,
+.fade-arrow-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
 }
 </style>
 

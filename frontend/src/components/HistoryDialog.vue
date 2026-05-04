@@ -124,7 +124,7 @@ async function loadAllSessions() {
         createdAt: session.lastActive,
         lastActive: session.lastActive,
         isPinned: !!session.isTop,
-        isTop: session.isTop,
+        isTop: session.isTop ? Number(session.isTop) : null,
         messages: [] // 历史对话框不需要显示消息内容
       }))
     } else {

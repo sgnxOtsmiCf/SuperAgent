@@ -282,7 +282,7 @@ async function loadUserInfo() {
 
   loading.value = true
   try {
-    const res = await userApi.getUserInfo(userStore.userInfo.userId)
+    const res = await userApi.getUserInfo()
     if (res.code === 200 && res.data) {
  // 更新 store 中的用户信息
       userStore.setUserInfo({

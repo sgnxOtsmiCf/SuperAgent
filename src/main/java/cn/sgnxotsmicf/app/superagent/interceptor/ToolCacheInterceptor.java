@@ -50,7 +50,7 @@ public class ToolCacheInterceptor extends ToolInterceptor {
         CacheEntry entry = cache.get(cacheKey);
         if (entry != null && !entry.isExpired(ttlMs)) {
             log.info("缓存命中: tool={}, key={}", request.getToolName(), cacheKey);
-            return entry.response;
+            return rebuildResponseWithNewToolCallId(entry.response, request.getToolCallId());
         }
 
         // 缓存未命中或已过期，移除旧缓存
@@ -79,6 +79,26 @@ public class ToolCacheInterceptor extends ToolInterceptor {
 
         return response;
     }
+
+    /**
+     * 使用新的 toolCallId 重建 ToolCallResponse。
+     * 缓存命中时，必须将响应中的 toolCallId 更新为当前请求的 toolCallId，
+     * 否则 API 会报 "tool response 的 id 和 tool_calls 不匹配" 错误。
+     */
+    private ToolCallResponse rebuildResponseWithNewToolCallId(ToolCallResponse cachedResponse, String newToolCallId) {
+        if (cachedResponse == null) {
+            return null;
+        }
+        return ToolCallResponse.builder()
+                .content(cachedResponse.getResult())
+                .toolName(cachedResponse.getToolName())
+                .toolCallId(newToolCallId)
+                .status(cachedResponse.getStatus())
+                .metadata(cachedResponse.getMetadata())
+                .build();
+    }
+
+
 
     @Override
     public String getName() {

@@ -4,8 +4,7 @@ import com.alibaba.cloud.ai.graph.agent.interceptor.Interceptor;
 import com.alibaba.cloud.ai.graph.agent.interceptor.todolist.TodoListInterceptor;
 import com.alibaba.cloud.ai.graph.agent.interceptor.toolretry.ToolRetryInterceptor;
 import com.alibaba.cloud.ai.graph.agent.interceptor.toolselection.ToolSelectionInterceptor;
-import jakarta.annotation.Resource;
-import org.springframework.ai.chat.model.ChatModel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.zhipuai.ZhiPuAiChatModel;
 import org.springframework.stereotype.Component;
 
@@ -13,29 +12,26 @@ import java.util.Arrays;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class InterceptorRegistry {
 
-    @Resource
-    private ChatModel dashscopeChatModel;
+    private final ZhiPuAiChatModel zhiPuAiChatModel;
 
-    @Resource
-    private ZhiPuAiChatModel zhiPuAiChatModel;
+    private final ModelLoggingInterceptor modelLoggingInterceptor;
 
-    @Resource
-    private ModelLoggingInterceptor modelLoggingInterceptor;
+    private final ToolMonitoringInterceptor toolMonitoringInterceptor;
 
-    @Resource
-    private ToolMonitoringInterceptor toolMonitoringInterceptor;
+    private final ToolCacheInterceptor toolCacheInterceptor;
 
-    @Resource
-    private ToolCacheInterceptor toolCacheInterceptor;
+    private final ReActTokenUsageInterceptor reActTokenUsageInterceptor;
 
     public List<Interceptor> buildInterceptors() {
         return Arrays.asList(
+                modelLoggingInterceptor,
+                //reActTokenUsageInterceptor,
                 TodoListInterceptor.builder().build(),
                 ToolSelectionInterceptor.builder().selectionModel(zhiPuAiChatModel).build(),
                 buildToolRetryInterceptor(),
-                modelLoggingInterceptor,
                 toolMonitoringInterceptor,
                 toolCacheInterceptor
         );

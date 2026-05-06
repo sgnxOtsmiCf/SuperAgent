@@ -1,5 +1,6 @@
 package cn.sgnxotsmicf.app.superagent.hook;
 
+import cn.sgnxotsmicf.app.superagent.hook.agent.TotalTokenSummaryHook;
 import cn.sgnxotsmicf.app.superagent.hook.log.AgentHookLog;
 import cn.sgnxotsmicf.app.superagent.hook.log.ModelHookLog;
 import cn.sgnxotsmicf.app.superagent.hook.message.ValidateResponseHook;
@@ -12,6 +13,7 @@ import com.alibaba.cloud.ai.graph.agent.hook.summarization.SummarizationHook;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
 import com.alibaba.cloud.ai.graph.skills.registry.classpath.ClasspathSkillRegistry;
 import com.alibaba.cloud.ai.graph.skills.registry.filesystem.FileSystemSkillRegistry;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
@@ -19,50 +21,46 @@ import java.util.Arrays;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class HookRegistry {
-    
+
     private final AgentHookLog agentHookLog;
+
     private final ModelHookLog modelHookLog;
+
     private final ChatModel dashscopeChatModel;
+
     private final MemoryHook memoryHook;
-    
-    public HookRegistry(
-            AgentHookLog agentHookLog,
-            ModelHookLog modelHookLog,
-            ChatModel chatModel,
-            MemoryHook memoryHook) {
-        this.agentHookLog = agentHookLog;
-        this.modelHookLog = modelHookLog;
-        this.dashscopeChatModel = chatModel;
-        this.memoryHook = memoryHook;
-    }
-    
+
+    private final TotalTokenSummaryHook totalTokenSummaryHook;
+
     public List<Hook> buildHooks() {
         return Arrays.asList(
-            new ValidateResponseHook(),
-            //agentHookLog,
-            //modelHookLog,
-            buildModelCallLimitHook(),
-            buildSummarizationHook(),
-            buildFileSystemSkillsAgentHook(),
-            memoryHook
+                //totalTokenSummaryHook,
+                new ValidateResponseHook(),
+                //agentHookLog,
+                //modelHookLog,
+                buildModelCallLimitHook(),
+                buildSummarizationHook(),
+                buildFileSystemSkillsAgentHook(),
+                memoryHook
         );
     }
-    
+
     private ModelCallLimitHook buildModelCallLimitHook() {
         return ModelCallLimitHook.builder()
-            .runLimit(10)
-            .exitBehavior(ModelCallLimitHook.ExitBehavior.ERROR)
-            .build();
+                .runLimit(10)
+                .exitBehavior(ModelCallLimitHook.ExitBehavior.ERROR)
+                .build();
     }
-    
+
     private SummarizationHook buildSummarizationHook() {
         return SummarizationHook.builder()
-            .model(dashscopeChatModel)
-            .maxTokensBeforeSummary(400000)
-            .messagesToKeep(20)
-            .keepFirstUserMessage(true)
-            .build();
+                .model(dashscopeChatModel)
+                .maxTokensBeforeSummary(400000)
+                .messagesToKeep(20)
+                .keepFirstUserMessage(true)
+                .build();
     }
 
     public SkillsAgentHook buildFileSystemSkillsAgentHook() {

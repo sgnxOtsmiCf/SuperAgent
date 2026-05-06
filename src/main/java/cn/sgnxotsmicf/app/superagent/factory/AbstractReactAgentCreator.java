@@ -59,7 +59,6 @@ public abstract class AbstractReactAgentCreator {
      * 模板方法：创建 Agent
      */
     public final ReactAgent createAgent(Map<String, Object> toolContextConfig,  ChatRequest request) {
-        String modelId = request.getModelId();
 
         ChatModel selectedModel = createChatModel(request);
         ChatOptions selectedOptions = createChatOptions(request);

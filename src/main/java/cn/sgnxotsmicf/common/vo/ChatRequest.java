@@ -1,9 +1,7 @@
 package cn.sgnxotsmicf.common.vo;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 
-import java.math.BigDecimal;
 
 @Data
 public class ChatRequest {

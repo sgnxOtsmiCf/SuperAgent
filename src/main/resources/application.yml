@@ -1,6 +1,6 @@
 super-agent:
   author: sgnxotsmicf
-  version: 0.10
+  version: 0.20
   description: 多智能体平台服务项目
 
 spring:
@@ -13,10 +13,61 @@ spring:
   application:
     name: SuperAgent
   ai:
+    chat:
+      observations:
+        log-prompt: false  #提示词日志(包含系统提示词、框架提示词和用户输入的完整输入)
+        log-completion: false  # 模型响应日志
+        include-error-logging: true
+      client:  # 客户端观测日志
+        observations:
+          log-prompt: false
+          log-completion: false
+    vectorstore:
+      observations:
+        log-query-response: false
+    tools:
+      observations:
+        include-content: false
+    alibaba:
+      arms:
+        enabled: true
+        model:
+          capture-input: true
+          capture-output: true
+        tool:
+          enabled: true
     mcp:
       client:
         stdio:
           servers-configuration: classpath:mcp-servers.json
+
+
+# 基础设施配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      probability: 1.0   #全量链路追踪（1.0=全采样，0=关闭）
+
+logging:
+  level:
+    org.springframework.ai.deepseek: info
+    org.springframework.ai: info
+    # 阿里云ARMS
+    com.alibaba.arms: info
+    # 关闭中间件冗余日志
+    org.redisson: warn
+    org.springframework.amqp: warn
+    com.alibaba.druid: warn
+    org.apache.tomcat: warn
+    root: info
+
 
 server:
   port: 8123
@@ -44,10 +95,6 @@ knife4j:
   setting:
     language: zh_cn
 
-logging:
-  level:
-    org.springframework.ai.deepseek: debug
-    org.springframework.ai: debug
 
 # mp
 mybatis-plus:

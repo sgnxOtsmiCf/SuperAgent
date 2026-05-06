@@ -5,9 +5,11 @@ import cn.sgnxotsmicf.common.result.ResultCodeEnum;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.alibaba.dashscope.utils.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.deepseek.DeepSeekAssistantMessage;
 import org.springframework.ai.zhipuai.ZhiPuAiAssistantMessage;
 import org.springframework.stereotype.Component;
@@ -17,6 +19,8 @@ import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.net.SocketException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 
 /**
@@ -28,7 +32,10 @@ import java.net.SocketException;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class StreamingHandler {
+
+    private final Executor superAgentExecutor;
 
     public void handle(Flux<NodeOutput> stream, SseEmitter emitter) {
         stream.subscribe(
@@ -136,6 +143,19 @@ public class StreamingHandler {
 //                                .name("modelFinish")
 //                                .data(output.message().getText()));
                     }
+                }
+                Usage usage = output.tokenUsage();
+                if (usage != null) {
+                    log.info(
+                            "Prompt Tokens: {} | Completion Tokens: {} | Total Tokens: {}",
+                            usage.getPromptTokens(),
+                            usage.getCompletionTokens(),
+                            usage.getTotalTokens()
+                    );
+                    CompletableFuture.runAsync(()->{
+                        //先不使用mq了，直接放到数据库吧
+
+                    });
                 }
             }
             case AGENT_TOOL_STREAMING -> emitter.send(SseEmitter.event()

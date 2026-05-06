@@ -4,9 +4,11 @@ package cn.sgnxotsmicf.config;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
+import cn.sgnxotsmicf.config.interceptor.AgentThreadLocalContextInterceptor;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -18,7 +20,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * @Description:
  */
 @Configuration
+@RequiredArgsConstructor
 public class SaTokenConfigure implements WebMvcConfigurer {
+
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -47,5 +51,16 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                     }
                 })
                 .addPathPatterns("/**");
+        registry.addInterceptor(new AgentThreadLocalContextInterceptor())
+                .addPathPatterns("/**")
+                .excludePathPatterns(
+                        "/user/login",
+                        "/user/registerPre",
+                        "/user/register",
+                        "/user/LoginWithPhoneCodePre",
+                        "/error",
+                        "/captcha/*",
+                        "/version/**",
+                        "/user/logout");
     }
 }

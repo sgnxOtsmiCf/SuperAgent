@@ -4,6 +4,7 @@ import cn.sgnxotsmicf.chatMemory.NoSqlChatMemoryFactory;
 import com.alibaba.cloud.ai.advisor.RetrievalRerankAdvisor;
 import com.alibaba.cloud.ai.model.RerankModel;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
@@ -22,25 +23,25 @@ import java.util.List;
  */
 
 @Component
+@RequiredArgsConstructor
 public class AdvisorRegister {
 
 
-    @Resource(name = "pgVectorStore")
-    private VectorStore pgVectorStore;
+    private final VectorStore pgVectorStore;
 
-    @Resource
-    private RerankModel dashscopeRerankModel;
+    private final RerankModel dashscopeRerankModel;
 
-    @Resource
-    private AgentLogAdvisor agentLogAdvisor;
+    private final AgentLogAdvisor agentLogAdvisor;
 
-    @Resource
-    private NoSqlChatMemoryFactory noSqlChatMemoryFactory;
+    private final NoSqlChatMemoryFactory noSqlChatMemoryFactory;
+
+    private final TokenAndTimingAdvisor tokenAndTimingAdvisor;
 
     public List<Advisor> buildAdvisors(int maxRounds) {
         ArrayList<Advisor> advisors = new ArrayList<Advisor>();
         advisors.add(retrievalRerankAdvisor());
         advisors.add(reActProtocolAdvisor(maxRounds));
+        advisors.add(tokenAndTimingAdvisor);
         //advisors.add(agentLogAdvisor);
         return advisors;
     }

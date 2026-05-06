@@ -1168,8 +1168,6 @@ function handleError(error) {
   }
 
   &.assistant {
-    padding-left: 10%;
-
     .assistant-message {
       display: flex;
       flex-direction: column;

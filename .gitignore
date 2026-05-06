@@ -38,3 +38,5 @@ chat-memory
 ai_sandbox
 src/main/resources/application-dev.yml
 **/dist
+examples-main
+AliyunJavaAgent
